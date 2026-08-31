@@ -1,0 +1,14 @@
+path: dataset
+train: images/train
+val: images/val
+test: images/test
+nc: 8
+names:
+  0: Coca-Cola 500ml
+  1: Lays Classic
+  2: Maggi Noodles
+  3: Dairy Milk
+  4: Pepsi 500ml
+  5: Sprite 500ml
+  6: KitKat
+  7: Kurkure Masala Munch

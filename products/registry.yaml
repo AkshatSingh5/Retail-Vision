@@ -1,0 +1,195 @@
+products:
+  - class_id: 0
+    product_id: 101
+    name: Coca-Cola 500ml
+    sku: COKE500
+    brand: Coca-Cola
+    category: Beverage
+    price: 40
+    tax_rate: 18
+    barcodes:
+      - "5449000000996"
+      - "5000112545414"
+      - "5449000054227"
+      - "049000050103"
+      - "5449000131805"
+      - "5000112637939"
+      - "54491472"
+      - "049000006461"
+    search_terms:
+      - Coca-Cola 500ml bottle
+      - Coca Cola 500 ml
+    name_include:
+      - coca
+    name_exclude:
+      - zero
+      - cherry
+      - light
+      - life
+      - vanilla
+      - lemon
+  - class_id: 1
+    product_id: 102
+    name: Lays Classic
+    sku: LAYSCLASSIC
+    brand: Lay's
+    category: Snacks
+    price: 20
+    tax_rate: 18
+    barcodes:
+      - "0028400090184"
+      - "0028400097329"
+      - "028400090184"
+      - "8410199000006"
+      - "8410199320001"
+      - "0028400168324"
+    search_terms:
+      - Lays Classic
+      - Lay's Classic potato chips
+    name_include:
+      - lay
+    name_exclude:
+      - baked
+      - oven
+      - waves
+      - stax
+  - class_id: 2
+    product_id: 103
+    name: Maggi Noodles
+    sku: MAGGI
+    brand: Maggi
+    category: Food
+    price: 14
+    tax_rate: 18
+    barcodes:
+      - "8901058851328"
+      - "8901058851311"
+      - "8901058000306"
+      - "0028000632519"
+      - "8901058006025"
+    search_terms:
+      - Maggi 2 minute noodles
+      - Maggi Masala noodles
+    name_include:
+      - maggi
+    name_exclude:
+      - sauce
+      - ketchup
+      - seasoning
+  - class_id: 3
+    product_id: 104
+    name: Dairy Milk
+    sku: DAIRYMILK
+    brand: Cadbury
+    category: Confectionery
+    price: 45
+    tax_rate: 18
+    barcodes:
+      - "7622202245558"
+      - "7622201762063"
+      - "7622202334009"
+      - "7622202346385"
+      - "5012035927648"
+    search_terms:
+      - Cadbury Dairy Milk chocolate
+      - Dairy Milk
+    name_include:
+      - dairy milk
+    name_exclude:
+      - oreo
+      - bubbly
+      - silk
+      - roast
+  - class_id: 4
+    product_id: 105
+    name: Pepsi 500ml
+    sku: PEPSI500
+    brand: Pepsi
+    category: Beverage
+    price: 40
+    tax_rate: 18
+    barcodes:
+      - "0040600001083"
+      - "4060800105260"
+      - "012000001289"
+      - "0049000028881"
+      - "4060800165400"
+    search_terms:
+      - Pepsi 500ml bottle
+      - Pepsi 500 ml
+    name_include:
+      - pepsi
+    name_exclude:
+      - max
+      - diet
+      - zero
+      - lime
+      - twist
+      - wild cherry
+  - class_id: 5
+    product_id: 106
+    name: Sprite 500ml
+    sku: SPRITE500
+    brand: Sprite
+    category: Beverage
+    price: 40
+    tax_rate: 18
+    barcodes:
+      - "049000028911"
+      - "5449000011527"
+      - "049000016522"
+      - "5000112611854"
+    search_terms:
+      - Sprite 500ml bottle
+      - Sprite 500 ml
+    name_include:
+      - sprite
+    name_exclude:
+      - zero
+      - lemon+
+      - cranberry
+  - class_id: 6
+    product_id: 107
+    name: KitKat
+    sku: KITKAT
+    brand: Nestle
+    category: Confectionery
+    price: 30
+    tax_rate: 18
+    barcodes:
+      - "7613035220065"
+      - "5000159407236"
+      - "8901058015171"
+      - "40052458"
+      - "6009188002213"
+    search_terms:
+      - KitKat chocolate
+      - Kit Kat 4 finger
+    name_include:
+      - kitkat
+      - kit kat
+    name_exclude:
+      - chunky
+      - drink
+      - ice cream
+  - class_id: 7
+    product_id: 108
+    name: Kurkure Masala Munch
+    sku: KURKURE
+    brand: Kurkure
+    category: Snacks
+    price: 20
+    tax_rate: 18
+    barcodes:
+      - "8901491101837"
+      - "8901491367046"
+      - "8901491503023"
+      - "8901491101820"
+    search_terms:
+      - Kurkure Masala Munch
+      - Kurkure
+    name_include:
+      - kurkure
+    name_exclude:
+      - green
+      - puffcorn
