@@ -22,27 +22,31 @@ function isVercelHost(host) {
   return host === "vercel.app" || host.endsWith(".vercel.app");
 }
 
+function isPlaceholder(value) {
+  return /your-backend-domain|example\.com|changeme/i.test(value);
+}
+
 if (process.env.VERCEL) {
   if (!url) {
-    console.error(
+    console.warn(
       "[frontend] API_BASE_URL is not set.\n" +
-        "Vercel hosts the POS UI only. /cart, /products, and /pos/status live on the GPU FastAPI backend.\n" +
-        "Set API_BASE_URL=https://YOUR-BACKEND-DOMAIN (no trailing slash) in Vercel env vars and redeploy.\n" +
+        "Vercel hosts the POS UI only. Catalog/cart will stay empty until you set\n" +
+        "API_BASE_URL=https://YOUR-BACKEND-DOMAIN (no trailing slash) and redeploy.\n" +
         "Do not set it to this Vercel URL.",
     );
-    process.exit(1);
-  }
-  const host = hostnameOf(url);
-  if (!host) {
-    console.error(`[frontend] API_BASE_URL is not a valid absolute URL: ${url}`);
-    process.exit(1);
-  }
-  if (isVercelHost(host)) {
-    console.error(
-      "[frontend] API_BASE_URL points at Vercel. That host is the static UI, not FastAPI.\n" +
-        "Set API_BASE_URL to the public HTTPS origin of the GPU backend.",
-    );
-    process.exit(1);
+  } else {
+    const host = hostnameOf(url);
+    if (!host) {
+      console.error(`[frontend] API_BASE_URL is not a valid absolute URL: ${url}`);
+      process.exit(1);
+    }
+    if (isVercelHost(host) || isPlaceholder(url)) {
+      console.error(
+        "[frontend] API_BASE_URL must be the public HTTPS origin of the GPU FastAPI backend.\n" +
+          "It cannot be a Vercel URL or a placeholder like https://YOUR-BACKEND-DOMAIN.",
+      );
+      process.exit(1);
+    }
   }
 }
 
