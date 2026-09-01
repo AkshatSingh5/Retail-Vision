@@ -169,6 +169,8 @@
     active: false,
     stream: null,
   };
+  let userWantsCamera = false;
+  let cameraToggleLock = false;
 
   // Backend Vision Hub Status Cache
   let hubVisionStatus = {
@@ -192,6 +194,30 @@
     return window.RetailVisionAPI ? window.RetailVisionAPI.mediaUrl(path) : path;
   }
 
+  function backendIsConfigured() {
+    return !window.RetailVisionAPI || window.RetailVisionAPI.isConfigured();
+  }
+
+  let backendUnavailable = false;
+  let pollTimers = [];
+
+  function stopBackendPolling() {
+    pollTimers.forEach((id) => clearInterval(id));
+    pollTimers = [];
+  }
+
+  function markBackendUnavailable(err) {
+    if (backendUnavailable) return;
+    backendUnavailable = true;
+    stopBackendPolling();
+    const missing = window.RetailVisionAPI && window.RetailVisionAPI.isRemoteStaticHost() && !window.RetailVisionAPI.API_BASE_URL;
+    const detail = err && err.message ? String(err.message) : "";
+    const msg = missing
+      ? "This Vercel UI has no backend URL. Set API_BASE_URL to your FastAPI origin (not this Vercel URL) and redeploy."
+      : `Cannot reach the POS API${detail ? ` (${detail})` : ""}.`;
+    showVisionMessage(msg, "error");
+  }
+
   function isCameraActive() {
     return Boolean(browserCamera.active || hubVisionStatus.camera_active);
   }
@@ -210,7 +236,9 @@
       } catch (_e) {
         /* ignore parse error */
       }
-      throw new Error(typeof detail === "string" ? detail : JSON.stringify(detail));
+      const error = new Error(typeof detail === "string" ? detail : JSON.stringify(detail));
+      error.status = response.status;
+      throw error;
     }
     if (response.status === 204) return null;
     const type = response.headers.get("content-type") || "";
@@ -389,12 +417,14 @@
     currentState = nextState;
     if (message) showVisionMessage(message);
 
-    const cameraOn = isCameraActive();
+    const cameraOn = isCameraActive() || (userWantsCamera && currentState === POS_STATES.CAMERA_STARTING);
     const busy = isApiBusy || [POS_STATES.CAPTURING, POS_STATES.SCANNING].includes(currentState);
 
-    // Update Toolbar Buttons
-    els.btnCameraToggle.disabled = busy;
+    // Close Camera stays clickable during a scan; Open Camera waits until idle.
+    els.btnCameraToggle.disabled = cameraToggleLock || (busy && !cameraOn);
     els.btnCameraText.textContent = cameraOn ? "Close Camera" : "Open Camera";
+    els.btnCameraToggle.classList.toggle("is-close", cameraOn);
+    els.btnCameraToggle.setAttribute("aria-pressed", cameraOn ? "true" : "false");
     els.btnCaptureSnapshot.disabled = busy || !cameraOn;
     els.btnScanProduct.disabled = busy || !cameraOn;
     els.btnGenerateBill.disabled = busy || activeCartItemCount === 0;
@@ -465,18 +495,51 @@
 
   function stopBrowserCameraStream() {
     if (browserCamera.stream) {
-      browserCamera.stream.getTracks().forEach((track) => track.stop());
+      browserCamera.stream.getTracks().forEach((track) => {
+        try {
+          track.stop();
+        } catch (_e) {
+          /* ignore */
+        }
+      });
       browserCamera.stream = null;
     }
     browserCamera.active = false;
-    els.liveVideo.srcObject = null;
-    els.liveVideo.classList.add("hidden");
+    if (els.liveVideo) {
+      try {
+        els.liveVideo.pause();
+      } catch (_e) {
+        /* ignore */
+      }
+      els.liveVideo.srcObject = null;
+      els.liveVideo.removeAttribute("src");
+      els.liveVideo.classList.add("hidden");
+    }
+  }
+
+  function stopHubPreview() {
+    hubVisionStatus.camera_active = false;
+    if (els.liveFeed) {
+      els.liveFeed.removeAttribute("src");
+      els.liveFeed.src = "";
+      els.liveFeed.classList.add("hidden");
+    }
+  }
+
+  async function stopHubCamera() {
+    try {
+      await api("/pos/camera/stop", { method: "POST" });
+    } catch (_e) {
+      /* Hub may already be off, or the static UI has no backend. */
+    }
+    hubVisionStatus.camera_active = false;
   }
 
   async function startBrowserCamera() {
     if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
       throw new Error("WebRTC camera not supported in this browser.");
     }
+    stopBrowserCameraStream();
     const stream = await navigator.mediaDevices.getUserMedia({
       video: {
         facingMode: { ideal: "environment" },
@@ -485,6 +548,10 @@
       },
       audio: false,
     });
+    if (!userWantsCamera) {
+      stream.getTracks().forEach((track) => track.stop());
+      throw new Error("Camera open cancelled.");
+    }
     browserCamera.stream = stream;
     browserCamera.active = true;
     els.liveVideo.srcObject = stream;
@@ -492,49 +559,57 @@
     els.liveFeed.classList.add("hidden");
     els.cameraOfflineOverlay.classList.add("hidden");
     els.feedLiveBadge.classList.remove("hidden");
+    try {
+      await els.liveVideo.play();
+    } catch (_e) {
+      /* autoplay can be blocked; srcObject still shows frames after a tap */
+    }
     return stream;
   }
 
-  async function toggleCamera() {
-    if (isCameraActive()) {
-      // Close Camera
-      setCameraLoadingOverlay(true, "Closing camera...");
-      stopBrowserCameraStream();
-      try {
-        if (hubVisionStatus.camera_active) {
-          await api("/pos/camera/stop", { method: "POST" });
-        }
-      } catch (_e) {
-        /* ignore */
-      }
-      hubVisionStatus.camera_active = false;
-      els.liveFeed.src = "";
-      els.liveFeed.classList.add("hidden");
-      els.cameraOfflineOverlay.classList.remove("hidden");
-      els.feedLiveBadge.classList.add("hidden");
-      clearCanvasOverlay();
-      setCameraLoadingOverlay(false);
-      setPosState(POS_STATES.CAMERA_OFFLINE, "Camera turned off.");
-      return;
-    }
+  async function closeCamera() {
+    userWantsCamera = false;
+    setCameraLoadingOverlay(true, "Closing camera...");
+    stopBrowserCameraStream();
+    stopHubPreview();
+    els.cameraOfflineOverlay.classList.remove("hidden");
+    els.feedLiveBadge.classList.add("hidden");
+    els.fpsMetaTag.classList.add("hidden");
+    els.latencyMetaTag.classList.add("hidden");
+    clearCanvasOverlay();
+    setCameraLoadingOverlay(false);
+    setPosState(POS_STATES.CAMERA_OFFLINE, "Camera turned off.");
+    stopHubCamera();
+  }
 
-    // Open Camera
+  async function openCamera() {
+    userWantsCamera = true;
     setCameraLoadingOverlay(true, "Connecting to camera feed...");
     setPosState(POS_STATES.CAMERA_STARTING, "Opening camera...");
 
-    // Try browser camera first for instant responsive preview
     try {
       await startBrowserCamera();
+      if (!userWantsCamera) {
+        stopBrowserCameraStream();
+        return;
+      }
       setCameraLoadingOverlay(false);
       setPosState(POS_STATES.CAMERA_ONLINE, "Camera online. Place product in scanning zone.");
       return;
     } catch (browserErr) {
+      if (!userWantsCamera) return;
       console.warn("Browser camera unavailable, falling back to backend camera hub:", browserErr);
     }
 
-    // Fallback: Start backend camera hub stream
+    if (!userWantsCamera) return;
+
     try {
       const info = await api("/pos/camera/start", { method: "POST" });
+      if (!userWantsCamera) {
+        await stopHubCamera();
+        stopHubPreview();
+        return;
+      }
       hubVisionStatus = { ...hubVisionStatus, ...info };
       els.liveFeed.src = `${apiUrl("/pos/stream")}?t=${Date.now()}`;
       els.liveFeed.classList.remove("hidden");
@@ -543,9 +618,48 @@
       setCameraLoadingOverlay(false);
       setPosState(POS_STATES.CAMERA_ONLINE, "Camera online via Retail Vision Hub.");
     } catch (hubErr) {
+      userWantsCamera = false;
       setCameraLoadingOverlay(false);
       els.cameraOfflineOverlay.classList.remove("hidden");
       setPosState(POS_STATES.ERROR, hubErr.message || "Could not open camera stream.");
+    }
+  }
+
+  async function toggleCamera() {
+    const shouldClose =
+      userWantsCamera || isCameraActive() || currentState === POS_STATES.CAMERA_STARTING;
+
+    if (shouldClose) {
+      userWantsCamera = false;
+      stopBrowserCameraStream();
+      stopHubPreview();
+      if (cameraToggleLock && currentState === POS_STATES.CAMERA_STARTING) {
+        setCameraLoadingOverlay(false);
+        els.cameraOfflineOverlay.classList.remove("hidden");
+        els.feedLiveBadge.classList.add("hidden");
+        setPosState(POS_STATES.CAMERA_OFFLINE, "Camera turned off.");
+        stopHubCamera();
+        return;
+      }
+      cameraToggleLock = true;
+      els.btnCameraToggle.disabled = true;
+      try {
+        await closeCamera();
+      } finally {
+        cameraToggleLock = false;
+        setPosState(currentState);
+      }
+      return;
+    }
+
+    if (cameraToggleLock) return;
+    cameraToggleLock = true;
+    els.btnCameraToggle.disabled = true;
+    try {
+      await openCamera();
+    } finally {
+      cameraToggleLock = false;
+      setPosState(currentState);
     }
   }
 
@@ -840,11 +954,13 @@
   }
 
   async function syncCart() {
+    if (backendUnavailable) return;
     try {
       const cart = await api("/cart");
       renderCartLines(cart);
     } catch (err) {
       console.error("Cart sync failed:", err);
+      if (err && (err.status === 404 || err.status === 0)) markBackendUnavailable(err);
     }
   }
 
@@ -1010,11 +1126,13 @@
   // CATALOG LOOKUP DRAWER CONTROLLERS
   // =========================================================================
   async function loadCatalog() {
+    if (backendUnavailable) return;
     try {
       catalogData = await api("/products");
       renderCatalogTable(els.catalogSearchInput.value);
     } catch (err) {
       console.warn("Catalog load failed:", err);
+      if (err && (err.status === 404 || err.status === 0)) markBackendUnavailable(err);
     }
   }
 
@@ -1307,14 +1425,39 @@
     window.addEventListener("resize", () => {
       resizeCanvasToDisplaySize();
     });
+
+    window.addEventListener("pagehide", () => {
+      userWantsCamera = false;
+      stopBrowserCameraStream();
+      stopHubPreview();
+    });
   }
 
   // =========================================================================
   // STATUS POLLING & APP BOOTSTRAP
   // =========================================================================
   async function refreshVisionHubStatus() {
+    if (backendUnavailable) return;
     try {
       const info = await api("/pos/status");
+
+      // Never reopen or show hub preview after the cashier clicked Close Camera.
+      if (!userWantsCamera) {
+        if (info.camera_active && !browserCamera.active) {
+          stopHubCamera();
+        }
+        hubVisionStatus = { ...hubVisionStatus, ...info, camera_active: false };
+        els.fpsMetaTag.classList.add("hidden");
+        els.latencyMetaTag.classList.add("hidden");
+        if (!browserCamera.active && currentState !== POS_STATES.CAMERA_OFFLINE && currentState !== POS_STATES.ERROR && currentState !== POS_STATES.CAMERA_STARTING) {
+          stopHubPreview();
+          els.cameraOfflineOverlay.classList.remove("hidden");
+          els.feedLiveBadge.classList.add("hidden");
+          setPosState(POS_STATES.CAMERA_OFFLINE);
+        }
+        return;
+      }
+
       hubVisionStatus = { ...hubVisionStatus, ...info };
 
       // Update FPS & Latency tags
@@ -1346,21 +1489,26 @@
         }
       }
     } catch (_err) {
-      // Hub status endpoint might be temporarily unavailable
+      if (_err && _err.status === 404) markBackendUnavailable(_err);
     }
   }
 
   async function boot() {
     initEventListeners();
+    if (!backendIsConfigured()) {
+      markBackendUnavailable(new Error("API_BASE_URL missing"));
+      setPosState(POS_STATES.CAMERA_OFFLINE);
+      return;
+    }
     await loadCatalog();
     await syncCart();
     await refreshVisionHubStatus();
 
-    setPosState(isCameraActive() ? POS_STATES.CAMERA_ONLINE : POS_STATES.CAMERA_OFFLINE);
+    setPosState(isCameraActive() && userWantsCamera ? POS_STATES.CAMERA_ONLINE : POS_STATES.CAMERA_OFFLINE);
 
     // Periodic Background Polls
-    setInterval(syncCart, 1800);
-    setInterval(refreshVisionHubStatus, 1800);
+    pollTimers.push(setInterval(syncCart, 1800));
+    pollTimers.push(setInterval(refreshVisionHubStatus, 1800));
   }
 
   // Run on DOM ready

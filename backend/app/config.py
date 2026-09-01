@@ -50,6 +50,20 @@ def cors_allow_origins() -> list[str]:
     return _unique_origins(local, extra, frontend)
 
 
+def cors_allow_origin_regex() -> str | None:
+    """Allow Vercel preview URLs (project-hash-team.vercel.app) in addition to FRONTEND_URL.
+
+    Override with CORS_ORIGIN_REGEX. Set to a single space or 'off' to disable the default.
+    """
+    explicit = os.getenv("CORS_ORIGIN_REGEX")
+    if explicit is not None:
+        value = explicit.strip()
+        if value.lower() in {"", "off", "none", "false"}:
+            return None
+        return value
+    return r"https://([a-z0-9-]+\.)*vercel\.app"
+
+
 def resolve_project_path(raw: str | Path) -> Path:
     """Resolve a relative path against backend/ first, then the repo root."""
     path = Path(raw)

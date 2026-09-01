@@ -29,6 +29,7 @@ from backend.app.config import (
     PRELOAD_YOLO,
     PROJECT_NAME,
     ROOT_DIR,
+    cors_allow_origin_regex,
     cors_allow_origins,
 )
 from backend.app.database import get_session_factory, init_db
@@ -143,6 +144,7 @@ app = FastAPI(title=PROJECT_NAME, lifespan=lifespan)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=cors_allow_origins(),
+    allow_origin_regex=cors_allow_origin_regex(),
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allow_headers=["*"],

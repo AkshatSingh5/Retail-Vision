@@ -438,6 +438,16 @@ html, body {
   border-color: var(--accent-gold-hover);
 }
 
+.btn-open-camera.is-close {
+  border-color: var(--status-red);
+  color: var(--text-primary);
+}
+
+.btn-open-camera.is-close:hover:not(:disabled) {
+  background: var(--status-red-subtle);
+  border-color: var(--status-red);
+}
+
 .btn-open-camera:disabled {
   opacity: 0.5;
   cursor: not-allowed;
