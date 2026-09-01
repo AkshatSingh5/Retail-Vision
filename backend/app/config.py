@@ -6,6 +6,9 @@ from dotenv import load_dotenv
 ROOT_DIR = Path(__file__).resolve().parents[2]
 load_dotenv(ROOT_DIR / ".env")
 
+# Vercel sets VERCEL=1 on every serverless build and request.
+ON_VERCEL = os.getenv("VERCEL") == "1"
+
 PROJECT_NAME = "Retail Vision"
 
 DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./retail_vision.db")
@@ -96,3 +99,16 @@ S3_PREFIX = os.getenv("S3_PREFIX", "products").strip().strip("/")
 FRAME_SKIP = int(os.getenv("FRAME_SKIP", "0"))
 _raw_imgsz = os.getenv("INFER_IMGSZ", "").strip()
 INFER_IMGSZ = int(_raw_imgsz) if _raw_imgsz.isdigit() and int(_raw_imgsz) > 0 else None
+
+# Serverless has no NVIDIA GPU and a read-only project filesystem.
+# Skip model preload and write SQLite/invoices/images under /tmp.
+if ON_VERCEL:
+    YOLO_DEVICE = "cpu"
+    DINO_DEVICE = "cpu"
+    PRELOAD_YOLO = False
+    PRELOAD_DINOV2 = False
+    PRELOAD_FLORENCE = False
+    _vercel_tmp = Path("/tmp/retail-vision")
+    INVOICE_DIR = _vercel_tmp / "invoices"
+    PRODUCT_IMAGE_DIR = _vercel_tmp / "products" / "images"
+    STORAGE_DIR = _vercel_tmp / "storage"

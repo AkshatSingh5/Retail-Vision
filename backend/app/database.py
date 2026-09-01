@@ -7,7 +7,7 @@ from sqlalchemy import create_engine, event
 from sqlalchemy.engine import Engine, make_url
 from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
 
-from backend.app.config import DATABASE_URL, ROOT_DIR
+from backend.app.config import DATABASE_URL, ON_VERCEL, ROOT_DIR
 
 
 class Base(DeclarativeBase):
@@ -28,6 +28,10 @@ def resolve_database_url(url: str | None = None) -> str:
     if not database or database == ":memory:":
         return raw
     db_path = Path(database)
+    if ON_VERCEL:
+        db_path = Path("/tmp/retail-vision") / db_path.name
+        db_path.parent.mkdir(parents=True, exist_ok=True)
+        return f"sqlite:///{db_path.as_posix()}"
     if not db_path.is_absolute():
         db_path = (ROOT_DIR / db_path).resolve()
     return f"sqlite:///{db_path.as_posix()}"

@@ -1,0 +1,9 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "functions": {
+    "backend/app/main.py": {
+      "maxDuration": 60,
+      "excludeFiles": "{dataset/**,reports/**,scripts/**,products/images/**,storage/**,invoices/**,.venv/**,**/*.pt,**/*.safetensors}"
+    }
+  }
+}
