@@ -3,7 +3,7 @@ from __future__ import annotations
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
-from fastapi.responses import FileResponse, Response
+from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
 from backend.app.api.caption import router as caption_router
@@ -23,6 +23,7 @@ from backend.app.services.seed import seed_products_from_registry
 
 STATIC_DIR = ROOT_DIR / "backend" / "app" / "static"
 POS_INDEX = STATIC_DIR / "pos" / "index.html"
+FAVICON = STATIC_DIR / "pos" / "favicon.png"
 
 _runtime: dict[str, str | bool | None] = {
     "yolo": "not_loaded",
@@ -129,9 +130,8 @@ def root() -> FileResponse:
 
 
 @app.get("/favicon.ico", include_in_schema=False)
-def favicon() -> Response:
-    # Avoid noisy browser 404s; POS has no dedicated favicon asset.
-    return Response(status_code=204)
+def favicon() -> FileResponse:
+    return FileResponse(FAVICON, media_type="image/png")
 
 
 @app.get("/api/health")

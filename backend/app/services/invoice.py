@@ -90,14 +90,17 @@ def build_invoice_pdf(transaction, items: list, output_path: Path) -> Path:
         Spacer(1, 8 * mm),
     ]
 
-    header = ["#", "Product", "SKU", "Qty", "Unit Price", "Tax", "Total"]
+    header = ["#", "Product", "SKU", "Weight", "Qty", "Unit Price", "Tax", "Total"]
     rows: list[list] = [header]
     for index, item in enumerate(items, start=1):
+        weight_val = getattr(item, "weight", None)
+        weight_str = str(weight_val) if weight_val else "-"
         rows.append(
             [
                 str(index),
                 str(item.name),
                 str(item.sku),
+                weight_str,
                 str(item.quantity),
                 _rupee(item.unit_price),
                 _rupee(item.tax),
@@ -105,7 +108,7 @@ def build_invoice_pdf(transaction, items: list, output_path: Path) -> Path:
             ]
         )
 
-    table = Table(rows, colWidths=[12 * mm, 55 * mm, 28 * mm, 14 * mm, 28 * mm, 22 * mm, 22 * mm])
+    table = Table(rows, colWidths=[10 * mm, 48 * mm, 24 * mm, 20 * mm, 14 * mm, 24 * mm, 17 * mm, 17 * mm])
     table.setStyle(
         TableStyle(
             [
@@ -113,12 +116,15 @@ def build_invoice_pdf(transaction, items: list, output_path: Path) -> Path:
                 ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
                 ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
                 ("FONTSIZE", (0, 0), (-1, -1), 9),
-                ("ALIGN", (3, 0), (-1, -1), "RIGHT"),
+                ("ALIGN", (0, 0), (0, -1), "CENTER"),
+                ("ALIGN", (1, 0), (2, -1), "LEFT"),
+                ("ALIGN", (3, 0), (3, -1), "CENTER"),
+                ("ALIGN", (4, 0), (-1, -1), "RIGHT"),
                 ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
                 ("GRID", (0, 0), (-1, -1), 0.3, colors.HexColor("#d5dbe3")),
                 ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, colors.HexColor("#f4f6f8")]),
-                ("LEFTPADDING", (0, 0), (-1, -1), 6),
-                ("RIGHTPADDING", (0, 0), (-1, -1), 6),
+                ("LEFTPADDING", (0, 0), (-1, -1), 5),
+                ("RIGHTPADDING", (0, 0), (-1, -1), 5),
                 ("TOPPADDING", (0, 0), (-1, -1), 6),
                 ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
             ]

@@ -149,6 +149,11 @@ def _migrate_product_columns(engine: Engine) -> None:
         if "image_url" not in image_cols:
             statements.append("ALTER TABLE product_images ADD COLUMN image_url VARCHAR(512)")
 
+    if "transaction_items" in tables:
+        item_cols = {column["name"] for column in inspector.get_columns("transaction_items")}
+        if "weight" not in item_cols:
+            statements.append("ALTER TABLE transaction_items ADD COLUMN weight VARCHAR(64)")
+
     if not statements:
         return
     with engine.begin() as connection:

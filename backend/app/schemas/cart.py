@@ -23,6 +23,7 @@ class TrackIngest(BaseModel):
     sku: str
     name: str | None = None
     product_name: str | None = None
+    weight: str | None = None
     unit_price: Decimal | None = None
     price: Decimal | None = None
     tax_rate: Decimal
@@ -37,6 +38,7 @@ class CartItemOut(BaseModel):
     product_id: int
     sku: str
     name: str
+    weight: str | None = None
     quantity: int
     unit_price: int | float
     tax: int | float
@@ -64,6 +66,7 @@ class TransactionItemOut(BaseModel):
     product_id: int | None
     sku: str
     name: str
+    weight: str | None = None
     quantity: int
     unit_price: Decimal
     tax: Decimal

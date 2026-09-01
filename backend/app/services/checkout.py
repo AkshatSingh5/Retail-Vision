@@ -59,6 +59,7 @@ def checkout(
                 product_id=item["product_id"],
                 sku=item["sku"],
                 name=item["name"],
+                weight=item.get("weight"),
                 quantity=int(item["quantity"]),
                 unit_price=money(item["unit_price"]),
                 tax_rate=money(item.get("tax_rate") or 0),

@@ -24,10 +24,12 @@ class CartLine:
         name: str,
         unit_price: Decimal,
         tax_rate: Decimal,
+        weight: str | None = None,
     ) -> None:
         self.product_id = int(product_id)
         self.sku = sku
         self.name = name
+        self.weight = weight
         self.unit_price = money(unit_price)
         self.tax_rate = money(tax_rate)
         self.track_ids: set[int] = set()
@@ -52,6 +54,7 @@ class CartLine:
             "product_id": self.product_id,
             "sku": self.sku,
             "name": self.name,
+            "weight": self.weight,
             "quantity": self.quantity,
             "unit_price": money_json(self.unit_price),
             "tax": money_json(tax),
@@ -263,11 +266,13 @@ class Cart:
                 name=str(product.name),
                 unit_price=product.price,
                 tax_rate=product.tax_rate,
+                weight=getattr(product, "weight", None),
             )
             self.lines[product_id] = line
         else:
             line.sku = str(product.sku)
             line.name = str(product.name)
+            line.weight = getattr(product, "weight", None)
             line.unit_price = money(product.price)
             line.tax_rate = money(product.tax_rate)
         return line
@@ -292,6 +297,7 @@ class Cart:
             name=str(track.get("name") or track.get("product_name") or ""),
             unit_price=Decimal(str(price)),
             tax_rate=Decimal(str(tax_rate)),
+            weight=track.get("weight"),
         )
         self.lines[product_id] = line
         return line
@@ -304,6 +310,7 @@ class Cart:
                 continue
             line.sku = str(product.sku)
             line.name = str(product.name)
+            line.weight = getattr(product, "weight", None)
             line.unit_price = money(product.price)
             line.tax_rate = money(product.tax_rate)
 

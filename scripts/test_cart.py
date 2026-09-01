@@ -80,7 +80,9 @@ def test_five_product_checkout(client: TestClient) -> None:
     by_sku = {item["sku"]: item for item in cart["items"]}
     check("5 different products in cart", len(cart["items"]) == 5, str(len(cart["items"])))
     check("two Coke tracks = qty 2", by_sku["COKE500"]["quantity"] == 2, str(by_sku.get("COKE500")))
+    check("Coke weight 500ml in cart", by_sku["COKE500"].get("weight") == "500ml", str(by_sku.get("COKE500")))
     check("Maggi x 1", by_sku["MAGGI"]["quantity"] == 1)
+    check("Maggi weight 70g in cart", by_sku["MAGGI"].get("weight") == "70g", str(by_sku.get("MAGGI")))
     check("Coke line total uses DB price and tax", by_sku["COKE500"]["total"] == 94.4, str(by_sku["COKE500"]))
     check("subtotal 184", cart["subtotal"] == 184, str(cart["subtotal"]))
     check("tax 33.12 from DB 18%", cart["tax"] == 33.12, str(cart["tax"]))
@@ -111,12 +113,16 @@ def test_five_product_checkout(client: TestClient) -> None:
     check("checkout 200", billed.status_code == 200, billed.text[:200])
     body = billed.json()
     check("invoice number assigned", body["invoice_number"].startswith("RV-"))
+    bill_by_sku = {item["sku"]: item for item in body["bill"]["items"]}
+    check("bill items contain weight (Coke 500ml)", bill_by_sku["COKE500"].get("weight") == "500ml", str(bill_by_sku.get("COKE500")))
     pdf = client.get(body["pdf_url"])
     check("PDF invoice downloadable", pdf.status_code == 200 and pdf.headers["content-type"].startswith("application/pdf"))
     check("cart cleared after bill", client.get("/cart").json()["items"] == [])
     stored = client.get(f"/transactions/{body['transaction_id']}").json()
     check("transaction persisted", stored["invoice_number"] == body["invoice_number"])
     check("5 product lines stored", len(stored["items"]) == 5, str(len(stored["items"])))
+    stored_by_sku = {item["sku"]: item for item in stored["items"]}
+    check("stored transaction item contains weight", stored_by_sku["COKE500"].get("weight") == "500ml", str(stored_by_sku.get("COKE500")))
     check("stored grand total matches", stored["grand_total"] == body["bill"]["grand_total"])
 
     cart_src = (ROOT_DIR / "backend" / "app" / "services" / "cart_service.py").read_text(encoding="utf-8")
