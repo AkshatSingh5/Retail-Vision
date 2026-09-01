@@ -36,12 +36,21 @@ from backend.app.database import get_session_factory, init_db
 from backend.app.services.seed import seed_products_from_registry
 
 STATIC_DIR = ROOT_DIR / "backend" / "app" / "static"
-POS_INDEX = FRONTEND_DIR / "index.html"
-if not POS_INDEX.is_file():
-    POS_INDEX = STATIC_DIR / "pos" / "index.html"
-FAVICON = FRONTEND_DIR / "src" / "favicon.png"
-if not FAVICON.is_file():
-    FAVICON = STATIC_DIR / "pos" / "favicon.png"
+_HTML_HEADERS = {"Cache-Control": "no-store"}
+
+
+def _pos_index() -> Path:
+    frontend_index = FRONTEND_DIR / "index.html"
+    if frontend_index.is_file():
+        return frontend_index
+    return STATIC_DIR / "pos" / "index.html"
+
+
+def _favicon() -> Path:
+    fav = FRONTEND_DIR / "src" / "favicon.png"
+    if fav.is_file():
+        return fav
+    return STATIC_DIR / "pos" / "favicon.png"
 
 _runtime: dict[str, str | bool | None] = {
     "yolo": "not_loaded",
@@ -168,15 +177,17 @@ if STATIC_DIR.is_dir():
 
 @app.get("/")
 def root():
-    if POS_INDEX.is_file():
-        return FileResponse(POS_INDEX, media_type="text/html")
+    path = _pos_index()
+    if path.is_file():
+        return FileResponse(path, media_type="text/html", headers=_HTML_HEADERS)
     return {"project": PROJECT_NAME, "status": "running", "ui": "not_bundled"}
 
 
 @app.get("/favicon.ico", include_in_schema=False)
 def favicon():
-    if FAVICON.is_file():
-        return FileResponse(FAVICON, media_type="image/png")
+    path = _favicon()
+    if path.is_file():
+        return FileResponse(path, media_type="image/png")
     return Response(status_code=204)
 
 

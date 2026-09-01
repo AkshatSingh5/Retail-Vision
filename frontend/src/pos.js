@@ -200,7 +200,7 @@
   }
 
   function missingBackendMessage() {
-    return "Recognition needs the FastAPI backend. Open http://127.0.0.1:8000, or set API_BASE_URL to that server in Vercel and redeploy.";
+    return "Scan runs on FastAPI, not Vercel. Open http://127.0.0.1:8000 and scan there.";
   }
 
   let backendUnavailable = false;
@@ -234,12 +234,17 @@
     }
     const response = await fetch(apiUrl(path), { headers, ...options });
     if (!response.ok) {
-      let detail = `${response.status} ${response.statusText}`;
-      try {
-        const payload = await response.json();
-        detail = payload.detail || detail;
-      } catch (_e) {
-        /* ignore parse error */
+      const type = response.headers.get("content-type") || "";
+      let detail = `${response.status} ${response.statusText}`.trim();
+      if (type.includes("application/json")) {
+        try {
+          const payload = await response.json();
+          detail = payload.detail || detail;
+        } catch (_e) {
+          /* ignore parse error */
+        }
+      } else if (response.status === 404) {
+        detail = missingBackendMessage();
       }
       const error = new Error(typeof detail === "string" ? detail : JSON.stringify(detail));
       error.status = response.status;
@@ -765,7 +770,7 @@
 
     const status = scanResponse.status || "unknown";
     let title = "Unknown Product";
-    let msg = "Unable to confidently identify this product against our catalog.";
+    let msg = scanResponse.message || "Unable to confidently identify this product against our catalog.";
     let badgeText = "UNKNOWN";
     let allowRegister = true;
 
@@ -789,12 +794,17 @@
       msg = "Multiple visually similar items detected in database. Please scan again.";
       badgeText = "AMBIGUOUS";
       allowRegister = false;
+    } else if (status === "not_found" || status === "product_not_found" || status === "unknown") {
+      title = "Unknown Product";
+      allowRegister = true;
     }
 
     els.failedTitleText.textContent = title;
     els.failedMsgText.textContent = msg;
     els.failedBadgeTag.textContent = badgeText;
-    els.btnRegisterUnknown.classList.toggle("hidden", !allowRegister);
+    if (els.btnRegisterUnknown) {
+      els.btnRegisterUnknown.classList.toggle("hidden", !allowRegister);
+    }
 
     // Preview Crop if provided
     if (scanResponse.preview_url) {
@@ -1320,7 +1330,9 @@
     });
 
     // 8. Product Registration Modal
-    els.btnRegisterUnknown.addEventListener("click", openProductRegistrationModal);
+    if (els.btnRegisterUnknown) {
+      els.btnRegisterUnknown.addEventListener("click", openProductRegistrationModal);
+    }
     els.btnCloseReg.addEventListener("click", closeProductRegistrationModal);
     els.btnCancelReg.addEventListener("click", closeProductRegistrationModal);
 
