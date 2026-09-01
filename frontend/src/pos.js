@@ -171,6 +171,7 @@
   };
   let userWantsCamera = false;
   let cameraToggleLock = false;
+  let hubStartedByClient = false;
 
   // Backend Vision Hub Status Cache
   let hubVisionStatus = {
@@ -198,6 +199,10 @@
     return !window.RetailVisionAPI || window.RetailVisionAPI.isConfigured();
   }
 
+  function missingBackendMessage() {
+    return "Recognition needs the FastAPI backend. Open http://127.0.0.1:8000, or set API_BASE_URL to that server in Vercel and redeploy.";
+  }
+
   let backendUnavailable = false;
   let pollTimers = [];
 
@@ -213,7 +218,7 @@
     const missing = window.RetailVisionAPI && window.RetailVisionAPI.isRemoteStaticHost() && !window.RetailVisionAPI.API_BASE_URL;
     const detail = err && err.message ? String(err.message) : "";
     const msg = missing
-      ? "This Vercel UI has no backend URL. Set API_BASE_URL to your FastAPI origin (not this Vercel URL) and redeploy."
+      ? missingBackendMessage()
       : `Cannot reach the POS API${detail ? ` (${detail})` : ""}.`;
     showVisionMessage(msg, "error");
   }
@@ -527,10 +532,16 @@
   }
 
   async function stopHubCamera() {
+    if (!hubStartedByClient || !backendIsConfigured()) {
+      hubStartedByClient = false;
+      hubVisionStatus.camera_active = false;
+      return;
+    }
+    hubStartedByClient = false;
     try {
       await api("/pos/camera/stop", { method: "POST" });
     } catch (_e) {
-      /* Hub may already be off, or the static UI has no backend. */
+      /* Hub may already be off. */
     }
     hubVisionStatus.camera_active = false;
   }
@@ -603,8 +614,17 @@
 
     if (!userWantsCamera) return;
 
+    if (!backendIsConfigured()) {
+      userWantsCamera = false;
+      setCameraLoadingOverlay(false);
+      els.cameraOfflineOverlay.classList.remove("hidden");
+      setPosState(POS_STATES.ERROR, missingBackendMessage());
+      return;
+    }
+
     try {
       const info = await api("/pos/camera/start", { method: "POST" });
+      hubStartedByClient = true;
       if (!userWantsCamera) {
         await stopHubCamera();
         stopHubPreview();
@@ -806,6 +826,11 @@
       setPosState(POS_STATES.ERROR, "Please open the camera before scanning.");
       return;
     }
+    if (!backendIsConfigured() || backendUnavailable) {
+      setPosState(POS_STATES.ERROR, missingBackendMessage());
+      showVisionMessage(missingBackendMessage(), "error");
+      return;
+    }
     if (isApiBusy) return;
 
     isApiBusy = true;
@@ -846,8 +871,12 @@
       }
     } catch (err) {
       console.error("Scan error:", err);
-      setPosState(POS_STATES.ERROR, err.message || "Product recognition failed.");
-      showVisionMessage(err.message || "Recognition service unavailable.", "error");
+      const msg =
+        err && (err.status === 404 || err.status === 0)
+          ? missingBackendMessage()
+          : err.message || "Product recognition failed.";
+      setPosState(POS_STATES.ERROR, msg);
+      showVisionMessage(msg, "error");
     } finally {
       isApiBusy = false;
       stopScanningAnimation();
