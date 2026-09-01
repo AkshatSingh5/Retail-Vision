@@ -495,6 +495,70 @@ html, body {
   color: var(--text-secondary);
 }
 
+.backend-connect-panel {
+  margin-top: 10px;
+  padding: 12px;
+  background: var(--bg-card);
+  border: 1px solid var(--status-amber);
+  border-radius: var(--radius-md);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.backend-connect-title {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.backend-connect-copy {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--text-secondary);
+}
+
+.backend-connect-copy .mono,
+.backend-connect-label {
+  font-family: var(--font-mono);
+}
+
+.backend-connect-label {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.backend-url-input {
+  width: 100%;
+  padding: 10px 12px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-default);
+  background: var(--bg-input);
+  color: var(--text-primary);
+  font-family: var(--font-mono);
+  font-size: 13px;
+}
+
+.backend-url-input:focus {
+  outline: none;
+  border-color: var(--accent-gold);
+}
+
+.btn-connect-backend {
+  width: 100%;
+  padding: 11px 16px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--accent-gold);
+  background: var(--accent-gold-subtle);
+  color: var(--text-primary);
+  font-family: var(--font-main);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
 /* ==========================================================================
    DETECTION SHOWCASE
    ========================================================================== */

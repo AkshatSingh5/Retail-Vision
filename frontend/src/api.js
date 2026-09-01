@@ -40,13 +40,44 @@
     return false;
   }
 
+  function pageIsHttps() {
+    return Boolean(global.location && global.location.protocol === "https:");
+  }
+
   function isUsableBackend(url) {
     if (!url || !/^https?:\/\//i.test(url)) return false;
     const host = hostnameOf(url);
     if (!host) return false;
     // The Vercel project is the static UI. Pointing the API at it yields /cart 404s.
     if (isVercelHost(host)) return false;
+    // Mixed content: an https POS page cannot call an http FastAPI origin.
+    if (pageIsHttps() && /^http:/i.test(url)) return false;
     return true;
+  }
+
+  function backendRejectReason(url) {
+    const normalized = normalize(url);
+    if (!normalized) return "Paste the public https:// URL of FastAPI.";
+    if (!/^https?:\/\//i.test(normalized)) return "Use a full URL, starting with https://";
+    const host = hostnameOf(normalized);
+    if (!host) return "That URL is not valid.";
+    if (isVercelHost(host)) return "Do not use the Vercel URL. Scan runs on FastAPI, not this static site.";
+    if (pageIsHttps() && /^http:/i.test(normalized)) {
+      return "This https page cannot call an http backend. Paste an https:// FastAPI URL, or open http://127.0.0.1:8000 on the computer running FastAPI.";
+    }
+    return "";
+  }
+
+  function setApiBase(url) {
+    const normalized = normalize(url);
+    const reason = backendRejectReason(normalized);
+    if (reason) return { ok: false, error: reason };
+    try {
+      global.localStorage.setItem(STORAGE_KEY, normalized);
+    } catch (_e) {
+      return { ok: false, error: "Could not save the backend URL in this browser." };
+    }
+    return { ok: true, url: normalized };
   }
 
   function readQueryOverride() {
@@ -124,5 +155,12 @@
     return apiUrl(path);
   }
 
-  global.RetailVisionAPI = { API_BASE_URL, apiUrl, mediaUrl, isConfigured, isRemoteStaticHost };
+  global.RetailVisionAPI = {
+    API_BASE_URL,
+    apiUrl,
+    mediaUrl,
+    isConfigured,
+    isRemoteStaticHost,
+    setApiBase,
+  };
 })(window);

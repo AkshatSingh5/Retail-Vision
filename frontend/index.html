@@ -9,7 +9,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@500;600;700;800&family=JetBrains+Mono:wght@500;600&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="/src/pos.css?v=3.0.6" />
+  <link rel="stylesheet" href="/src/pos.css?v=3.0.7" />
 </head>
 <body>
   <div class="pos-app">
@@ -93,6 +93,25 @@
         <div id="vision-message-bar" class="vision-msg-bar hidden" role="status">
           <span id="vision-message-icon" class="msg-icon">ℹ️</span>
           <span id="vision-message-text" class="msg-text"></span>
+        </div>
+
+        <div id="backend-connect-panel" class="backend-connect-panel hidden">
+          <p class="backend-connect-title">FastAPI backend required</p>
+          <p class="backend-connect-copy">
+            This Vercel page is the scanner UI only. Scan Product sends the camera frame to FastAPI (YOLO + DINOv2).
+            On the computer running the backend, open <span class="mono">http://127.0.0.1:8000</span>.
+            From a phone, paste that server’s public <span class="mono">https://</span> URL below.
+          </p>
+          <label class="backend-connect-label" for="backend-url-input">FastAPI URL</label>
+          <input
+            id="backend-url-input"
+            class="backend-url-input"
+            type="url"
+            inputmode="url"
+            autocomplete="off"
+            placeholder="https://your-fastapi-host"
+          />
+          <button id="btn-save-backend-url" class="btn-connect-backend" type="button">Connect and reload</button>
         </div>
 
         <div id="detection-showcase-panel" class="detection-showcase-panel is-idle">
@@ -401,7 +420,7 @@
   </div>
 
   <script src="/src/config.js"></script>
-  <script src="/src/api.js"></script>
-  <script src="/src/pos.js?v=3.0.6"></script>
+  <script src="/src/api.js?v=3.0.7"></script>
+  <script src="/src/pos.js?v=3.0.7"></script>
 </body>
 </html>

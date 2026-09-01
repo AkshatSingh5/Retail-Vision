@@ -73,6 +73,9 @@
     visionMessageBar: document.getElementById("vision-message-bar"),
     visionMessageIcon: document.getElementById("vision-message-icon"),
     visionMessageText: document.getElementById("vision-message-text"),
+    backendConnectPanel: document.getElementById("backend-connect-panel"),
+    backendUrlInput: document.getElementById("backend-url-input"),
+    btnSaveBackendUrl: document.getElementById("btn-save-backend-url"),
 
     // Showcase Panel
     showcaseIdle: document.getElementById("showcase-idle"),
@@ -200,7 +203,27 @@
   }
 
   function missingBackendMessage() {
-    return "Scan runs on FastAPI, not Vercel. Open http://127.0.0.1:8000 and scan there.";
+    return "Scan runs on FastAPI, not Vercel. On this computer open http://127.0.0.1:8000, or paste the FastAPI https:// URL below.";
+  }
+
+  function showBackendConnectPanel() {
+    if (!els.backendConnectPanel) return;
+    if (!window.RetailVisionAPI || !window.RetailVisionAPI.isRemoteStaticHost()) return;
+    els.backendConnectPanel.classList.remove("hidden");
+    if (els.backendUrlInput && window.RetailVisionAPI.API_BASE_URL && !els.backendUrlInput.value) {
+      els.backendUrlInput.value = window.RetailVisionAPI.API_BASE_URL;
+    }
+  }
+
+  function saveBackendUrlAndReload() {
+    if (!window.RetailVisionAPI || !window.RetailVisionAPI.setApiBase) return;
+    const raw = els.backendUrlInput ? els.backendUrlInput.value : "";
+    const result = window.RetailVisionAPI.setApiBase(raw);
+    if (!result.ok) {
+      showVisionMessage(result.error, "error");
+      return;
+    }
+    window.location.reload();
   }
 
   let backendUnavailable = false;
@@ -221,6 +244,7 @@
       ? missingBackendMessage()
       : `Cannot reach the POS API${detail ? ` (${detail})` : ""}.`;
     showVisionMessage(msg, "error");
+    showBackendConnectPanel();
   }
 
   function isCameraActive() {
@@ -839,6 +863,7 @@
     if (!backendIsConfigured() || backendUnavailable) {
       setPosState(POS_STATES.ERROR, missingBackendMessage());
       showVisionMessage(missingBackendMessage(), "error");
+      showBackendConnectPanel();
       return;
     }
     if (isApiBusy) return;
@@ -1259,6 +1284,17 @@
 
     // 2. Scan Trigger
     els.btnScanProduct.addEventListener("click", executeProductScan);
+    if (els.btnSaveBackendUrl) {
+      els.btnSaveBackendUrl.addEventListener("click", saveBackendUrlAndReload);
+    }
+    if (els.backendUrlInput) {
+      els.backendUrlInput.addEventListener("keydown", (event) => {
+        if (event.key === "Enter") {
+          event.preventDefault();
+          saveBackendUrlAndReload();
+        }
+      });
+    }
     els.btnTryScanAgain.addEventListener("click", resetShowcaseToIdle);
     els.btnScanAgainFound.addEventListener("click", resetShowcaseToIdle);
 
