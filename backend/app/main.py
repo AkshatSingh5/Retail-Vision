@@ -12,12 +12,8 @@ for _path in (str(_ROOT_DIR), str(_BACKEND_DIR)):
         sys.path.insert(0, _path)
 
 from fastapi import FastAPI
-<<<<<<< HEAD
-from fastapi.responses import FileResponse
-=======
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, Response
->>>>>>> 88934153f0d17f13cd25be9aa4c8a60d9c74f082
 from fastapi.staticfiles import StaticFiles
 
 from backend.app.api.caption import router as caption_router
@@ -39,14 +35,12 @@ from backend.app.database import get_session_factory, init_db
 from backend.app.services.seed import seed_products_from_registry
 
 STATIC_DIR = ROOT_DIR / "backend" / "app" / "static"
-<<<<<<< HEAD
-POS_INDEX = STATIC_DIR / "pos" / "index.html"
-FAVICON = STATIC_DIR / "pos" / "favicon.png"
-=======
 POS_INDEX = FRONTEND_DIR / "index.html"
 if not POS_INDEX.is_file():
     POS_INDEX = STATIC_DIR / "pos" / "index.html"
->>>>>>> 88934153f0d17f13cd25be9aa4c8a60d9c74f082
+FAVICON = FRONTEND_DIR / "src" / "favicon.png"
+if not FAVICON.is_file():
+    FAVICON = STATIC_DIR / "pos" / "favicon.png"
 
 _runtime: dict[str, str | bool | None] = {
     "yolo": "not_loaded",
@@ -177,13 +171,10 @@ def root():
 
 
 @app.get("/favicon.ico", include_in_schema=False)
-<<<<<<< HEAD
-def favicon() -> FileResponse:
-    return FileResponse(FAVICON, media_type="image/png")
-=======
-def favicon() -> Response:
+def favicon():
+    if FAVICON.is_file():
+        return FileResponse(FAVICON, media_type="image/png")
     return Response(status_code=204)
->>>>>>> 88934153f0d17f13cd25be9aa4c8a60d9c74f082
 
 
 @app.get("/api/health")

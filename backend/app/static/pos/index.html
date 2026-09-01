@@ -3,190 +3,101 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-  <title>Retail Vision — Autonomous POS Terminal</title>
+  <title>Retail Vision — Product Scanner</title>
   <link rel="icon" href="/static/pos/favicon.png" type="image/png" />
   <link rel="apple-touch-icon" href="/static/pos/favicon.png" />
-  <!-- Google Fonts: Outfit & Inter -->
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@500;600;700;800&family=JetBrains+Mono:wght@500;600&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="/static/pos/pos.css?v=2.0.0" />
+  <link rel="stylesheet" href="/static/pos/pos.css?v=3.0.0" />
 </head>
 <body>
   <div class="pos-app">
-    <!-- TOP NAVIGATION & STATUS BAR -->
     <header class="pos-header">
-      <div class="brand-group">
-        <div class="brand-badge">
-          <svg class="brand-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"></path>
-            <line x1="3" y1="6" x2="21" y2="6"></line>
-            <path d="M16 10a4 4 0 0 1-8 0"></path>
-          </svg>
-        </div>
-        <div class="brand-text">
-          <div class="brand-title-row">
-            <h1 class="brand-title">Retail Vision</h1>
-            <span class="brand-tag">POS TERMINAL</span>
-          </div>
-          <p class="brand-subtitle">AI Autonomous Product Recognition</p>
-        </div>
+      <div class="brand-block">
+        <p class="brand-kicker">PRODUCT SCANNER</p>
+        <h1 class="brand-title">Retail Vision</h1>
       </div>
 
-      <div class="header-center">
-        <div id="ai-pipeline-badge" class="ai-pipeline-badge">
-          <span class="pipeline-step active">YOLO26m</span>
-          <span class="pipeline-arrow">→</span>
-          <span class="pipeline-step active">DINOv2</span>
-          <span class="pipeline-arrow">→</span>
-          <span class="pipeline-step active">pgvector</span>
+      <div class="header-right">
+        <div id="cam-status-pill" class="status-pill offline" title="Camera stream status">
+          <span class="status-dot"></span>
+          <span id="cam-status-text">offline</span>
         </div>
-      </div>
-
-      <div class="header-actions">
-        <div class="system-status-pills">
-          <div id="cam-status-pill" class="status-pill offline" title="Camera stream status">
-            <span class="status-dot"></span>
-            <span id="cam-status-text">Camera Offline</span>
-          </div>
-          <div id="txn-pill" class="status-pill mono-pill" title="Current transaction identifier">
-            <span class="mono-label">TXN</span>
-            <span id="txn-id" class="mono-value">—</span>
-          </div>
+        <div id="txn-pill" class="txn-id" title="Current transaction identifier">
+          TXN <span id="txn-id">—</span>
         </div>
-
-        <div class="utility-buttons">
-          <button id="btn-open-catalog" class="icon-text-btn" type="button" title="Open Product Catalog">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path></svg>
-            <span>Catalog</span>
-          </button>
-          <button id="btn-open-caption" class="icon-text-btn" type="button" title="Florence-2 Image to Text Assistant">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
-            <span>Image to Text</span>
-          </button>
-          <button id="btn-new-txn" class="icon-text-btn new-txn-btn" type="button" title="Start fresh transaction">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"></path><path d="M21 3v5h-5"></path><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"></path><path d="M3 21v-5h5"></path></svg>
-            <span>New Bill</span>
-          </button>
-        </div>
+        <button id="btn-open-caption" class="sr-only" type="button" title="Florence-2 Image to Text Assistant">Image to Text</button>
       </div>
     </header>
 
-    <!-- MAIN POS WORKSPACE -->
     <main class="pos-workspace">
-      <!-- LEFT SECTION: CAMERA & DETECTION (~60%) -->
-      <section class="viewport-section" aria-label="Product Scanner Stage">
-        <div class="camera-card">
-          <!-- Camera Feed & Bounding Box Overlay Container -->
-          <div class="viewfinder-container" id="viewfinder">
-            <!-- Loading & State Overlays -->
-            <div id="camera-loading-overlay" class="viewfinder-overlay loading-overlay hidden">
-              <div class="spinner-ring"></div>
-              <p id="camera-loading-text" class="overlay-msg">Starting camera stream...</p>
+      <section class="scanner-col" aria-label="Product Scanner">
+        <div class="scanner-viewport" id="viewfinder">
+          <div id="camera-loading-overlay" class="viewfinder-overlay loading-overlay hidden">
+            <div class="spinner-ring"></div>
+            <p id="camera-loading-text" class="overlay-msg">Starting camera stream...</p>
+          </div>
+
+          <div id="camera-offline-overlay" class="viewfinder-overlay offline-overlay">
+            <button id="btn-quick-start" class="sr-only" type="button">Open Camera</button>
+          </div>
+
+          <video id="live-video" autoplay playsinline muted class="camera-media hidden"></video>
+          <img id="live-feed" class="camera-media hidden" alt="POS Camera Stream" src="" />
+          <canvas id="overlay-canvas" class="bounding-box-canvas"></canvas>
+
+          <div class="product-area-frame" id="hud-reticle">
+            <span class="product-area-label">PRODUCT AREA</span>
+          </div>
+
+          <div class="viewfinder-meta-top">
+            <div id="feed-live-badge" class="meta-tag live-tag hidden">
+              <span class="pulse-dot"></span>
+              <span>LIVE FEED</span>
             </div>
-
-            <!-- Offline Placeholder -->
-            <div id="camera-offline-overlay" class="viewfinder-overlay offline-overlay">
-              <div class="offline-icon-box">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75">
-                  <path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"></path>
-                  <circle cx="12" cy="13" r="3"></circle>
-                  <line x1="1" y1="1" x2="23" y2="23" stroke-width="2"></line>
-                </svg>
-              </div>
-              <h3>Camera Offline</h3>
-              <p>Click <strong>Open Camera</strong> below to start live product detection.</p>
-              <button id="btn-quick-start" class="btn btn-primary btn-sm" type="button">Open Camera</button>
-            </div>
-
-            <!-- Live Video / Stream Media -->
-            <video id="live-video" autoplay playsinline muted class="camera-media hidden"></video>
-            <img id="live-feed" class="camera-media hidden" alt="POS Camera Stream" src="" />
-
-            <!-- Dynamic Bounding Box Canvas -->
-            <canvas id="overlay-canvas" class="bounding-box-canvas"></canvas>
-
-            <!-- Viewfinder HUD / Reticle -->
-            <div class="viewfinder-hud" id="hud-reticle">
-              <div class="hud-corner top-left"></div>
-              <div class="hud-corner top-right"></div>
-              <div class="hud-corner bottom-left"></div>
-              <div class="hud-corner bottom-right"></div>
-              <div class="hud-target-center">
-                <span class="hud-text">ALIGN PRODUCT IN ZONE</span>
-              </div>
-            </div>
-
-            <!-- Viewfinder Floating Meta Tags -->
-            <div class="viewfinder-meta-top">
-              <div id="feed-live-badge" class="meta-tag live-tag hidden">
-                <span class="pulse-dot"></span>
-                <span>LIVE FEED</span>
-              </div>
-              <div id="fps-meta-tag" class="meta-tag mono-tag hidden">
-                <span id="fps-value">0</span> FPS
-              </div>
-            </div>
-
-            <div class="viewfinder-meta-bottom">
-              <div id="detection-status-chip" class="status-chip ready">
-                <span id="status-chip-dot" class="chip-dot"></span>
-                <span id="status-chip-text">Ready to scan</span>
-              </div>
-              <div id="latency-meta-tag" class="meta-tag mono-tag hidden">
-                <span id="latency-value">0</span> ms
-              </div>
+            <div id="fps-meta-tag" class="meta-tag mono-tag hidden">
+              <span id="fps-value">0</span> FPS
             </div>
           </div>
 
-          <!-- Camera Toolbar Controls -->
-          <div class="camera-toolbar">
-            <div class="toolbar-left">
-              <button id="btn-camera-toggle" class="btn btn-secondary" type="button">
-                <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path><circle cx="12" cy="13" r="4"></circle></svg>
-                <span id="btn-camera-text">Open Camera</span>
-              </button>
-
-              <button id="btn-capture-snapshot" class="btn btn-outline" type="button" disabled title="Capture preview frame">
-                <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><circle cx="12" cy="12" r="3"></circle></svg>
-                <span>Capture</span>
-              </button>
+          <div class="viewfinder-meta-bottom hidden-hud">
+            <div id="detection-status-chip" class="status-chip ready">
+              <span id="status-chip-dot" class="chip-dot"></span>
+              <span id="status-chip-text">Ready to scan</span>
             </div>
-
-            <div class="toolbar-right">
-              <button id="btn-scan-product" class="btn btn-scan" type="button" disabled>
-                <span class="scan-btn-glow"></span>
-                <svg class="btn-icon scan-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M3 7V5a2 2 0 0 1 2-2h2"></path><path d="M17 3h2a2 2 0 0 1 2 2v2"></path><path d="M21 17v2a2 2 0 0 1-2 2h-2"></path><path d="M7 21H5a2 2 0 0 1-2-2v-2"></path><line x1="7" y1="12" x2="17" y2="12"></line></svg>
-                <span id="scan-btn-label">Scan Product</span>
-              </button>
+            <div id="latency-meta-tag" class="meta-tag mono-tag hidden">
+              <span id="latency-value">0</span> ms
             </div>
           </div>
 
-          <!-- Real-Time Detection Notification Banner -->
-          <div id="vision-message-bar" class="vision-msg-bar hidden" role="status">
-            <span id="vision-message-icon" class="msg-icon">ℹ️</span>
-            <span id="vision-message-text" class="msg-text"></span>
-          </div>
+          <p class="viewport-hint">Open the camera, place one product in view, then click Scan Product.</p>
+          <p id="viewport-cam-label" class="viewport-cam-label">camera off.</p>
         </div>
 
-        <!-- DETECTED PRODUCT & RECOGNITION SHOWCASE CARD -->
-        <div id="detection-showcase-panel" class="detection-showcase-panel">
-          <!-- Placeholder State (When no active scan) -->
-          <div id="showcase-idle" class="showcase-card showcase-idle">
-            <div class="idle-graphic">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-                <rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect>
-                <line x1="8" y1="21" x2="16" y2="21"></line>
-                <line x1="12" y1="17" x2="12" y2="21"></line>
-              </svg>
-            </div>
-            <div class="idle-content">
-              <h4>Ready for Recognition</h4>
-              <p>Place an item on the scanner and click <strong>Scan Product</strong> to trigger YOLO26m detection + DINOv2 embedding search.</p>
-            </div>
-          </div>
+        <p class="scanner-status">
+          <span class="status-bullet"></span>
+          <span id="scanner-status-line">Camera Offline Status: Camera closed</span>
+        </p>
 
-          <!-- Product Found Card -->
+        <div class="scanner-actions">
+          <button id="btn-camera-toggle" class="btn-open-camera" type="button">
+            <span id="btn-camera-text">Open Camera</span>
+          </button>
+          <button id="btn-scan-product" class="btn-scan-product" type="button" disabled>
+            <span id="scan-btn-label">Scan Product</span>
+          </button>
+          <button id="btn-capture-snapshot" class="sr-only" type="button" disabled>Capture</button>
+        </div>
+
+        <div id="vision-message-bar" class="vision-msg-bar hidden" role="status">
+          <span id="vision-message-icon" class="msg-icon">ℹ️</span>
+          <span id="vision-message-text" class="msg-text"></span>
+        </div>
+
+        <div id="detection-showcase-panel" class="detection-showcase-panel is-idle">
+          <div id="showcase-idle" class="showcase-card showcase-idle hidden"></div>
+
           <div id="showcase-found" class="showcase-card showcase-found hidden" aria-live="polite">
             <div class="showcase-media-box">
               <img id="detected-prod-img" class="detected-crop-img" alt="Detected Product Crop" src="" />
@@ -223,7 +134,6 @@
             </div>
           </div>
 
-          <!-- Recognition Failed / Unknown Product Card -->
           <div id="showcase-failed" class="showcase-card showcase-failed hidden" aria-live="polite">
             <div class="showcase-media-box failed-box">
               <img id="failed-crop-img" class="detected-crop-img" alt="Unrecognized Crop" src="" />
@@ -250,119 +160,62 @@
         </div>
       </section>
 
-      <!-- RIGHT SECTION: SHOPPING CART & BILLING (~40%) -->
-      <aside class="cart-section" aria-label="Shopping Cart & Billing Summary">
-        <div class="cart-card">
-          <!-- Cart Header -->
-          <div class="cart-header">
-            <div class="cart-title-row">
-              <div class="cart-icon-title">
-                <svg class="cart-heading-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <circle cx="9" cy="21" r="1"></circle>
-                  <circle cx="20" cy="21" r="1"></circle>
-                  <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"></path>
-                </svg>
-                <h2>Current Cart</h2>
-              </div>
-              <span id="cart-item-badge" class="cart-badge">0 items</span>
-            </div>
-            <button id="btn-clear-cart" class="btn-ghost-sm" type="button" title="Clear all items in cart">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
-              <span>Clear</span>
-            </button>
+      <aside class="bill-col" aria-label="Current Bill">
+        <div class="bill-card">
+          <div class="bill-header">
+            <h2>CURRENT BILL</h2>
+            <button id="btn-new-txn" class="btn-new-bill" type="button" title="Start fresh transaction">New bill</button>
           </div>
 
-          <!-- Alert Notification Strip -->
           <div id="cart-alerts" class="cart-alert-box hidden" role="alert"></div>
+          <span id="cart-item-badge" class="sr-only">0 items</span>
 
-          <!-- Cart Line Items Container -->
-          <div class="cart-body">
-            <!-- Empty Cart State -->
+          <div class="bill-body">
             <div id="cart-empty-state" class="cart-empty-view">
-              <div class="empty-cart-icon">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-                  <path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"></path>
-                  <line x1="3" y1="6" x2="21" y2="6"></line>
-                  <path d="M16 10a4 4 0 0 1-8 0"></path>
-                </svg>
-              </div>
-              <h4>Your Cart is Empty</h4>
-              <p>Scan a product or select an item from the catalog to begin checkout.</p>
+              <p>No items yet. Scan a product or add from the <button id="btn-open-catalog" class="text-link" type="button">catalog</button>.</p>
             </div>
-
-            <!-- Active Line Items List -->
             <ul id="cart-lines-list" class="cart-lines-list hidden"></ul>
           </div>
 
-          <!-- BILLING & CHECKOUT SUMMARY (BOTTOM ACTION AREA) -->
-          <div class="billing-summary-footer">
-            <!-- Discount Preset Row -->
-            <div class="discount-control-box">
-              <div class="discount-label-row">
-                <label for="discount-input">Discount Rate</label>
-                <div class="preset-chips">
-                  <button type="button" class="discount-chip" data-pct="0">0%</button>
-                  <button type="button" class="discount-chip" data-pct="5">5%</button>
-                  <button type="button" class="discount-chip" data-pct="10">10%</button>
-                </div>
-              </div>
-              <div class="discount-input-wrap">
-                <input id="discount-input" type="number" min="0" max="100" step="0.5" value="0" placeholder="0" />
-                <span class="pct-symbol">%</span>
-              </div>
+          <div class="bill-summary">
+            <div class="summary-row">
+              <span class="summary-label">Subtotal</span>
+              <span id="bill-subtotal" class="summary-val">₹0</span>
+            </div>
+            <div class="summary-row">
+              <span class="summary-label">Tax / GST</span>
+              <span id="bill-tax" class="summary-val">₹0</span>
+            </div>
+            <div id="discount-row" class="summary-row">
+              <span class="summary-label">Discount</span>
+              <span id="bill-discount" class="summary-val">₹0</span>
+            </div>
+            <div class="summary-row grand-total-row">
+              <span class="grand-total-label">TOTAL</span>
+              <span id="bill-grand-total" class="grand-total-val">₹0</span>
             </div>
 
-            <!-- Financial Breakdown Table -->
-            <div class="financial-breakdown">
-              <div class="summary-row">
-                <span class="summary-label">Subtotal</span>
-                <span id="bill-subtotal" class="summary-val">₹0</span>
-              </div>
-              <div class="summary-row">
-                <span class="summary-label">Tax / GST (Calculated)</span>
-                <span id="bill-tax" class="summary-val">₹0</span>
-              </div>
-              <div id="discount-row" class="summary-row discount-row hidden">
-                <span class="summary-label">Discount Applied</span>
-                <span id="bill-discount" class="summary-val discount-val">-₹0</span>
-              </div>
-              <div class="summary-divider"></div>
-              <div class="summary-row grand-total-row">
-                <div class="grand-label-group">
-                  <span class="grand-total-label">GRAND TOTAL</span>
-                  <span class="grand-total-sub">All taxes included</span>
-                </div>
-                <div class="grand-total-display">
-                  <span id="bill-grand-total" class="grand-total-val">₹0</span>
-                </div>
-              </div>
+            <div class="discount-field">
+              <label for="discount-input">Discount %</label>
+              <input id="discount-input" type="number" min="0" max="100" step="0.5" value="0" />
             </div>
 
-            <!-- Primary Action Buttons -->
-            <div class="checkout-action-group">
-              <button id="btn-generate-bill" class="btn btn-checkout" type="button" disabled>
-                <span class="checkout-btn-content">
-                  <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
-                    <polyline points="14 2 14 8 20 8"></polyline>
-                    <line x1="16" y1="13" x2="8" y2="13"></line>
-                    <line x1="16" y1="17" x2="8" y2="17"></line>
-                    <polyline points="10 9 9 9 8 9"></polyline>
-                  </svg>
-                  <span id="checkout-btn-text">Generate Bill</span>
-                </span>
-                <span class="checkout-arrow">→</span>
-              </button>
-            </div>
+            <button id="btn-scan-next" class="btn-scan-next" type="button">Scan Next Product</button>
           </div>
         </div>
       </aside>
     </main>
+
+    <footer class="pos-footer">
+      <button id="btn-clear-cart" class="btn-clear-cart" type="button">Clear cart</button>
+      <button id="btn-generate-bill" class="btn-generate-bill" type="button" disabled>
+        <span id="checkout-btn-text">GENERATE BILL</span>
+      </button>
+    </footer>
   </div>
 
-  <!-- MODALS & AUXILIARY DRAWERS -->
+  <!-- MODALS -->
 
-  <!-- 1. CHECKOUT SUCCESS & PDF INVOICE MODAL -->
   <div id="checkout-modal" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="modal-inv-title">
     <div class="modal-card invoice-success-card">
       <div class="success-check-badge">
@@ -397,7 +250,6 @@
     </div>
   </div>
 
-  <!-- 2. PRODUCT REGISTRATION MODAL -->
   <div id="product-reg-modal" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="modal-reg-title">
     <div class="modal-card product-reg-card">
       <div class="modal-head">
@@ -465,7 +317,6 @@
     </div>
   </div>
 
-  <!-- 3. SIMILAR PRODUCT FOUND CONFLICT MODAL -->
   <div id="similar-modal" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="similar-title">
     <div class="modal-card similar-card">
       <p class="modal-eyebrow">DUPLICATE RECOGNITION</p>
@@ -486,7 +337,6 @@
     </div>
   </div>
 
-  <!-- 4. CATALOG LOOKUP MODAL / DRAWER -->
   <div id="catalog-modal" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="catalog-modal-title">
     <div class="modal-card catalog-card">
       <div class="modal-head">
@@ -517,7 +367,6 @@
     </div>
   </div>
 
-  <!-- 5. FLORENCE-2 IMAGE TO TEXT MODAL -->
   <div id="caption-modal" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="caption-modal-title">
     <div class="modal-card caption-card">
       <div class="modal-head">
@@ -528,7 +377,7 @@
         <button id="btn-close-caption" class="btn-close-modal" type="button" aria-label="Close modal">×</button>
       </div>
       <p class="caption-desc">Generate detailed descriptive prompts for product imagery using Florence-2. This is an informational assistant tool.</p>
-      
+
       <div class="caption-tool-grid">
         <div class="caption-upload-side">
           <label class="caption-drop-zone" for="caption-file-input">
@@ -552,7 +401,6 @@
     </div>
   </div>
 
-  <!-- APPLICATION JAVASCRIPT -->
-  <script src="/static/pos/pos.js?v=2.0.0"></script>
+  <script src="/static/pos/pos.js?v=3.0.0"></script>
 </body>
 </html>

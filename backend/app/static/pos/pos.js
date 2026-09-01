@@ -40,6 +40,10 @@
     btnOpenCatalog: document.getElementById("btn-open-catalog"),
     btnOpenCaption: document.getElementById("btn-open-caption"),
     btnNewTxn: document.getElementById("btn-new-txn"),
+    viewportCamLabel: document.getElementById("viewport-cam-label"),
+    scannerStatusLine: document.getElementById("scanner-status-line"),
+    btnScanNext: document.getElementById("btn-scan-next"),
+    detectionShowcasePanel: document.getElementById("detection-showcase-panel"),
 
     // Viewfinder & Camera
     viewfinder: document.getElementById("viewfinder"),
@@ -179,6 +183,15 @@
   // =========================================================================
   // HELPER UTILITIES
   // =========================================================================
+  function apiUrl(path) {
+    return window.RetailVisionAPI ? window.RetailVisionAPI.apiUrl(path) : path;
+  }
+
+  function mediaUrl(path) {
+    if (!path) return path;
+    return window.RetailVisionAPI ? window.RetailVisionAPI.mediaUrl(path) : path;
+  }
+
   function isCameraActive() {
     return Boolean(browserCamera.active || hubVisionStatus.camera_active);
   }
@@ -188,7 +201,7 @@
     if (!(options.body instanceof FormData) && !headers["Content-Type"] && options.body) {
       headers["Content-Type"] = "application/json";
     }
-    const response = await fetch(path, { headers, ...options });
+    const response = await fetch(apiUrl(path), { headers, ...options });
     if (!response.ok) {
       let detail = `${response.status} ${response.statusText}`;
       try {
@@ -410,7 +423,27 @@
     // Camera Status Pill in Top Header
     els.camStatusPill.classList.toggle("online", cameraOn);
     els.camStatusPill.classList.toggle("offline", !cameraOn);
-    els.camStatusText.textContent = cameraOn ? "Camera Online" : "Camera Offline";
+    els.camStatusText.textContent = cameraOn ? "online" : "offline";
+
+    if (els.viewfinder) {
+      els.viewfinder.classList.toggle("is-live", cameraOn);
+    }
+
+    if (els.viewportCamLabel) {
+      els.viewportCamLabel.textContent = cameraOn ? "camera on." : "camera off.";
+    }
+
+    if (els.scannerStatusLine) {
+      if (currentState === POS_STATES.CAMERA_STARTING) {
+        els.scannerStatusLine.textContent = "Camera Offline Status: Starting camera";
+      } else if (!cameraOn) {
+        els.scannerStatusLine.textContent = "Camera Offline Status: Camera closed";
+      } else if (currentState === POS_STATES.SCANNING || currentState === POS_STATES.CAPTURING) {
+        els.scannerStatusLine.textContent = "Camera Online Status: Scanning";
+      } else {
+        els.scannerStatusLine.textContent = "Camera Online Status: Camera live";
+      }
+    }
 
     // Scan Button text & spinner
     if (currentState === POS_STATES.SCANNING) {
@@ -503,7 +536,7 @@
     try {
       const info = await api("/pos/camera/start", { method: "POST" });
       hubVisionStatus = { ...hubVisionStatus, ...info };
-      els.liveFeed.src = `/pos/stream?t=${Date.now()}`;
+      els.liveFeed.src = `${apiUrl("/pos/stream")}?t=${Date.now()}`;
       els.liveFeed.classList.remove("hidden");
       els.cameraOfflineOverlay.classList.add("hidden");
       els.feedLiveBadge.classList.remove("hidden");
@@ -535,7 +568,7 @@
     }
 
     // Backend camera hub snapshot
-    const response = await fetch("/pos/camera/capture", { method: "POST" });
+    const response = await fetch(apiUrl("/pos/camera/capture"), { method: "POST" });
     if (!response.ok) throw new Error("Backend camera capture failed.");
     return await response.blob();
   }
@@ -543,7 +576,14 @@
   // =========================================================================
   // PRODUCT SCANNING & RECOGNITION PIPELINE
   // =========================================================================
+  function setShowcaseIdle(idle) {
+    if (els.detectionShowcasePanel) {
+      els.detectionShowcasePanel.classList.toggle("is-idle", idle);
+    }
+  }
+
   function renderFoundProductCard(product, bbox) {
+    setShowcaseIdle(false);
     els.showcaseIdle.classList.add("hidden");
     els.showcaseFailed.classList.add("hidden");
     els.showcaseFound.classList.remove("hidden");
@@ -573,7 +613,7 @@
     // Crop or Product Image
     const imgUrl = product.image_url || (currentScanResult && currentScanResult.preview_url);
     if (imgUrl) {
-      els.detectedProdImg.src = `${imgUrl}?t=${Date.now()}`;
+      els.detectedProdImg.src = `${mediaUrl(imgUrl)}?t=${Date.now()}`;
       els.detectedProdImg.style.display = "block";
     } else {
       els.detectedProdImg.style.display = "none";
@@ -584,6 +624,7 @@
   }
 
   function renderFailedRecognitionCard(scanResponse, bbox) {
+    setShowcaseIdle(false);
     els.showcaseIdle.classList.add("hidden");
     els.showcaseFound.classList.add("hidden");
     els.showcaseFailed.classList.remove("hidden");
@@ -623,7 +664,7 @@
 
     // Preview Crop if provided
     if (scanResponse.preview_url) {
-      els.failedCropImg.src = `${scanResponse.preview_url}?t=${Date.now()}`;
+      els.failedCropImg.src = `${mediaUrl(scanResponse.preview_url)}?t=${Date.now()}`;
       els.failedCropImg.style.display = "block";
     } else {
       els.failedCropImg.style.display = "none";
@@ -640,7 +681,8 @@
     clearCanvasOverlay();
     els.showcaseFound.classList.add("hidden");
     els.showcaseFailed.classList.add("hidden");
-    els.showcaseIdle.classList.remove("hidden");
+    els.showcaseIdle.classList.add("hidden");
+    setShowcaseIdle(true);
     currentScanResult = null;
     setPosState(isCameraActive() ? POS_STATES.CAMERA_ONLINE : POS_STATES.CAMERA_OFFLINE, "Ready to scan.");
   }
@@ -731,12 +773,8 @@
     // Summary Totals
     els.billSubtotal.textContent = rupee(cart.subtotal);
     els.billTax.textContent = rupee(cart.tax);
-    els.billDiscount.textContent = `-₹${Number(cart.discount || 0).toLocaleString("en-IN")}`;
+    els.billDiscount.textContent = rupee(cart.discount);
     els.billGrandTotal.textContent = rupee(cart.grand_total);
-
-    // Show/Hide Discount Row
-    const hasDiscount = Number(cart.discount || 0) > 0;
-    els.discountRow.classList.toggle("hidden", !hasDiscount);
 
     // Keep discount input in sync
     if (document.activeElement !== els.discountInput) {
@@ -847,7 +885,7 @@
     if (activeCartItemCount === 0 || isApiBusy) return;
     isApiBusy = true;
     els.btnGenerateBill.disabled = true;
-    els.checkoutBtnText.textContent = "Generating Bill...";
+    els.checkoutBtnText.textContent = "GENERATING BILL...";
 
     try {
       const result = await api("/checkout", { method: "POST" });
@@ -855,7 +893,7 @@
       // Populate Checkout Success Modal
       els.modalInvoiceNum.textContent = result.invoice_number;
       els.modalInvoiceTotal.textContent = rupee(result.bill ? result.bill.grand_total : result.cart.grand_total);
-      els.modalPdfLink.href = result.pdf_url;
+      els.modalPdfLink.href = mediaUrl(result.pdf_url);
 
       // Show Modal
       els.checkoutModal.classList.remove("hidden");
@@ -870,7 +908,7 @@
     } finally {
       isApiBusy = false;
       els.btnGenerateBill.disabled = false;
-      els.checkoutBtnText.textContent = "Generate Bill";
+      els.checkoutBtnText.textContent = "GENERATE BILL";
     }
   }
 
@@ -884,7 +922,7 @@
 
     // Set preview image if we have a captured crop or scan
     if (currentScanResult && currentScanResult.preview_url) {
-      els.regImgPreview.src = `${currentScanResult.preview_url}?t=${Date.now()}`;
+      els.regImgPreview.src = `${mediaUrl(currentScanResult.preview_url)}?t=${Date.now()}`;
       els.regImgPreview.style.display = "block";
     } else if (lastCapturedBlob) {
       els.regImgPreview.src = URL.createObjectURL(lastCapturedBlob);
@@ -926,7 +964,7 @@
       data.append("image", lastCapturedBlob, "new_product.jpg");
     }
 
-    const response = await fetch("/products/register", {
+    const response = await fetch(apiUrl("/products/register"), {
       method: "POST",
       body: data,
     });
@@ -959,7 +997,7 @@
     els.similarProdSku.textContent = `SKU: ${product.sku || "—"}`;
 
     if (product.image_url) {
-      els.similarPreviewImg.src = `${product.image_url}?t=${Date.now()}`;
+      els.similarPreviewImg.src = `${mediaUrl(product.image_url)}?t=${Date.now()}`;
       els.similarPreviewImg.style.display = "block";
     } else {
       els.similarPreviewImg.style.display = "none";
@@ -1102,13 +1140,25 @@
       }, 300);
     });
 
-    els.discountPresetChips.forEach((chip) => {
-      chip.addEventListener("click", () => {
-        const pct = Number(chip.dataset.pct);
-        els.discountInput.value = pct;
-        applyCartDiscount(pct);
+    if (els.discountPresetChips) {
+      els.discountPresetChips.forEach((chip) => {
+        chip.addEventListener("click", () => {
+          const pct = Number(chip.dataset.pct);
+          els.discountInput.value = pct;
+          applyCartDiscount(pct);
+        });
       });
-    });
+    }
+
+    if (els.btnScanNext) {
+      els.btnScanNext.addEventListener("click", () => {
+        if (isCameraActive() && !isApiBusy) {
+          executeProductScan();
+        } else if (!isCameraActive()) {
+          toggleCamera();
+        }
+      });
+    }
 
     // 7. Checkout & Modal Actions
     els.btnGenerateBill.addEventListener("click", executeCheckout);
@@ -1283,7 +1333,7 @@
       // If backend camera changed state outside this client
       if (!browserCamera.active) {
         if (hubVisionStatus.camera_active && currentState === POS_STATES.CAMERA_OFFLINE) {
-          els.liveFeed.src = `/pos/stream?t=${Date.now()}`;
+          els.liveFeed.src = `${apiUrl("/pos/stream")}?t=${Date.now()}`;
           els.liveFeed.classList.remove("hidden");
           els.cameraOfflineOverlay.classList.add("hidden");
           els.feedLiveBadge.classList.remove("hidden");
