@@ -1,0 +1,23 @@
+# Local development only: PostgreSQL + pgvector.
+# The GPU backend is not started here so frontend work does not need NVIDIA hardware.
+
+services:
+  db:
+    image: pgvector/pgvector:pg16
+    container_name: retail-vision-pg
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: retail_vision
+    ports:
+      - "5432:5432"
+    volumes:
+      - retail_vision_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d retail_vision"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  retail_vision_pgdata:

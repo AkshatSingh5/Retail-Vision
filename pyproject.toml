@@ -3,10 +3,8 @@ name = "retail-vision"
 version = "0.1.0"
 description = "AI-powered retail product detection and automatic billing"
 requires-python = ">=3.12"
-# Vercel installs only this list (uv sync, no extras). Keep it web-only.
-# CUDA PyTorch + ultralytics + transformers were ~5.2 GB and exceeded the
-# 500 MB (and even 5 GB Large Function) bundle limit. OpenCV is also omitted:
-# it crashes Vercel (missing libGL/libgthread). Scan uses Pillow + color embeddings.
+# GPU / vision stack: pip install -r backend/requirements.txt  (or uv sync --extra ml)
+# Do not deploy this Python project to Vercel.
 dependencies = [
     "annotated-doc==0.0.5",
     "annotated-types==0.8.0",
@@ -42,6 +40,7 @@ dependencies = [
     "starlette==1.6.0",
     "typing-inspection==0.4.4",
     "typing_extensions==4.16.0",
+    "uvicorn[standard]>=0.32.0",
 ]
 
 [project.optional-dependencies]
@@ -74,6 +73,3 @@ ml = [
 
 [tool.uv]
 package = false
-
-[tool.vercel]
-entrypoint = "backend.app.main:app"

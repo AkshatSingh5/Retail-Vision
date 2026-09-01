@@ -15,6 +15,7 @@ import torch
 from PIL import Image
 
 from backend.app.config import FLORENCE_MODEL
+from vision.device import gpu_name, resolve_device
 
 logger = logging.getLogger(__name__)
 
@@ -47,9 +48,13 @@ class FlorenceCaptioner:
     """Lazy Florence-2 captioner. Loaded on first use."""
 
     def __init__(self, model_id: str = FLORENCE_MODEL) -> None:
-        self.device = "cuda" if torch.cuda.is_available() else "cpu"
+        self.device = resolve_device("cuda")
         self.model_id = model_id
+        gpu = gpu_name() or "n/a"
         print(f"[Florence-2] Loading {model_id} on {self.device}...")
+        print(f"Florence device: {self.device}")
+        if str(self.device).startswith("cuda"):
+            print(f"  GPU: {gpu}")
         self.model, self.processor, self.model_id = self._load(model_id)
         self.model.to(self.device)
         self.model.eval()

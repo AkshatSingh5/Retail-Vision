@@ -1,9 +1,7 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "functions": {
-    "backend/app/main.py": {
-      "maxDuration": 60,
-      "excludeFiles": "{dataset/**,reports/**,scripts/**,tests/**,runs/**,logs/**,products/images/**,storage/**,invoices/**,.venv/**,huggingface/**,.hf_home/**,.cache/**,**/*.pt,**/*.pth,**/*.onnx,**/*.safetensors,**/*.bin}"
-    }
-  }
+  "framework": null,
+  "installCommand": "cd frontend && npm install",
+  "buildCommand": "cd frontend && npm run build",
+  "outputDirectory": "frontend"
 }

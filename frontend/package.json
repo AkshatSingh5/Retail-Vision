@@ -1,0 +1,9 @@
+{
+  "name": "retail-vision-frontend",
+  "private": true,
+  "description": "Retail Vision POS UI (static). Deploy this folder to Vercel.",
+  "scripts": {
+    "build": "node ./scripts/write-config.js",
+    "start": "npx --yes serve -l 3000 ."
+  }
+}

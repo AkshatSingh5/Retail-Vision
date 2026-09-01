@@ -1,9 +1,18 @@
 from __future__ import annotations
 
+import sys
 from contextlib import asynccontextmanager
 from pathlib import Path
 
+_APP_DIR = Path(__file__).resolve().parent
+_BACKEND_DIR = _APP_DIR.parent
+_ROOT_DIR = _BACKEND_DIR.parent
+for _path in (str(_ROOT_DIR), str(_BACKEND_DIR)):
+    if _path not in sys.path:
+        sys.path.insert(0, _path)
+
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, Response
 from fastapi.staticfiles import StaticFiles
 
@@ -11,20 +20,24 @@ from backend.app.api.caption import router as caption_router
 from backend.app.api.cart import router as cart_router
 from backend.app.api.pos import router as pos_router
 from backend.app.api.products import router as products_router
+from backend.app.api.routes.health import router as health_router
 from backend.app.config import (
+    FRONTEND_DIR,
     INVOICE_DIR,
-    ON_VERCEL,
     PRELOAD_DINOV2,
     PRELOAD_FLORENCE,
     PRELOAD_YOLO,
     PROJECT_NAME,
     ROOT_DIR,
+    cors_allow_origins,
 )
 from backend.app.database import get_session_factory, init_db
 from backend.app.services.seed import seed_products_from_registry
 
 STATIC_DIR = ROOT_DIR / "backend" / "app" / "static"
-POS_INDEX = STATIC_DIR / "pos" / "index.html"
+POS_INDEX = FRONTEND_DIR / "index.html"
+if not POS_INDEX.is_file():
+    POS_INDEX = STATIC_DIR / "pos" / "index.html"
 
 _runtime: dict[str, str | bool | None] = {
     "yolo": "not_loaded",
@@ -89,6 +102,7 @@ async def lifespan(_app: FastAPI):
 
             detector = get_yolo_detector()
             _runtime["yolo"] = f"Loaded ({detector.device})"
+            print(f"YOLO device: {detector.device}")
             print("YOLO26m: Loaded")
         except Exception as extra:
             _runtime["yolo"] = "FAILED"
@@ -101,6 +115,7 @@ async def lifespan(_app: FastAPI):
 
             embedder = get_dinov2()
             _runtime["dinov2"] = f"Loaded ({embedder.device})"
+            print(f"DINO device: {embedder.device}")
             print("DINOv2: Loaded")
         except Exception as extra:
             _runtime["dinov2"] = "FAILED"
@@ -122,15 +137,25 @@ async def lifespan(_app: FastAPI):
 
 
 app = FastAPI(title=PROJECT_NAME, lifespan=lifespan)
-# Existing POS paths (no /api prefix) — keep for the UI.
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=cors_allow_origins(),
+    allow_credentials=True,
+    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allow_headers=["*"],
+)
+app.include_router(health_router)
 app.include_router(products_router)
 app.include_router(cart_router)
 app.include_router(pos_router)
 app.include_router(caption_router)
-# Spec aliases: /api/products/*, /api/cart/*, /api/bills/generate, /api/caption
 app.include_router(products_router, prefix="/api")
 app.include_router(cart_router, prefix="/api")
 app.include_router(caption_router, prefix="/api")
+
+frontend_src = FRONTEND_DIR / "src"
+if frontend_src.is_dir():
+    app.mount("/src", StaticFiles(directory=frontend_src), name="frontend_src")
 if STATIC_DIR.is_dir():
     app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 
@@ -144,22 +169,15 @@ def root():
 
 @app.get("/favicon.ico", include_in_schema=False)
 def favicon() -> Response:
-    # Avoid noisy browser 404s; POS has no dedicated favicon asset.
     return Response(status_code=204)
 
 
 @app.get("/api/health")
-def health() -> dict:
-    from vision.device import cuda_available, gpu_name, resolve_device, torch_version
-
-    device = resolve_device("cpu" if ON_VERCEL else "cuda", warn=False)
+def api_health() -> dict:
+    """Diagnostic status. Does not load YOLO/DINOv2; reports already-loaded runtime."""
     return {
         "project": PROJECT_NAME,
-        "status": "running",
-        "device": device,
-        "cuda": cuda_available(),
-        "gpu": gpu_name(),
-        "pytorch": torch_version(),
+        "status": "ok",
         "yolo26m": _runtime["yolo"],
         "dinov2": _runtime["dinov2"],
     }

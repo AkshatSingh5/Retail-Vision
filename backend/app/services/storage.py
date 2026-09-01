@@ -172,3 +172,32 @@ def delete_product_image(storage_key: str) -> None:
     path = resolve_storage_path(storage_key)
     if path.exists() and path.is_file():
         path.unlink()
+
+
+class StorageService:
+    """Filesystem (local) or S3 object storage. Database stores keys/URLs, not blobs."""
+
+    def save_image(
+        self,
+        product_id: int,
+        image_bytes: bytes,
+        *,
+        image_type: str = "original",
+    ) -> tuple[str, np.ndarray]:
+        return save_product_image(product_id, image_bytes, image_type=image_type)
+
+    def get_image(self, storage_key: str) -> Path:
+        return get_product_image(storage_key)
+
+    def delete_image(self, storage_key: str) -> None:
+        delete_product_image(storage_key)
+
+
+_storage_service: StorageService | None = None
+
+
+def get_storage_service() -> StorageService:
+    global _storage_service
+    if _storage_service is None:
+        _storage_service = StorageService()
+    return _storage_service

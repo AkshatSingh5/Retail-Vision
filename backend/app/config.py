@@ -3,21 +3,71 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 
-ROOT_DIR = Path(__file__).resolve().parents[2]
-load_dotenv(ROOT_DIR / ".env")
+from backend.app.paths import BACKEND_DIR, ROOT_DIR
 
-# Vercel sets VERCEL=1 (and VERCEL_ENV) on every serverless build and request.
+load_dotenv(ROOT_DIR / ".env")
+load_dotenv(BACKEND_DIR / ".env")
+
+# Vercel sets VERCEL=1 on serverless builds. The GPU backend must not run there.
 ON_VERCEL = os.getenv("VERCEL") in {"1", "true", "TRUE"} or bool(os.getenv("VERCEL_ENV"))
 
 PROJECT_NAME = "Retail Vision"
 
 DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./retail_vision.db")
+DIRECT_URL = os.getenv("DIRECT_URL", DATABASE_URL)
 
-# Prefer YOLO_MODEL_PATH; fall back to MODEL_PATH for older .env files.
+FRONTEND_URL = os.getenv("FRONTEND_URL", "").strip().rstrip("/")
+
+
+def _unique_origins(*groups: list[str]) -> list[str]:
+    seen: set[str] = set()
+    out: list[str] = []
+    for group in groups:
+        for raw in group:
+            origin = raw.strip().rstrip("/")
+            if not origin or origin == "*":
+                continue
+            key = origin.lower()
+            if key in seen:
+                continue
+            seen.add(key)
+            out.append(origin)
+    return out
+
+
+def cors_allow_origins() -> list[str]:
+    """Explicit frontend origins. Never returns '*'."""
+    local = [
+        "http://localhost:3000",
+        "http://127.0.0.1:3000",
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+        "http://localhost:8000",
+        "http://127.0.0.1:8000",
+    ]
+    extra = [item for item in os.getenv("CORS_ORIGINS", "").split(",") if item.strip()]
+    frontend = [FRONTEND_URL] if FRONTEND_URL else []
+    return _unique_origins(local, extra, frontend)
+
+
+def resolve_project_path(raw: str | Path) -> Path:
+    """Resolve a relative path against backend/ first, then the repo root."""
+    path = Path(raw)
+    if path.is_absolute():
+        return path
+    backend_candidate = BACKEND_DIR / path
+    root_candidate = ROOT_DIR / path
+    if backend_candidate.exists():
+        return backend_candidate
+    if root_candidate.exists():
+        return root_candidate
+    return backend_candidate
+
+
 _raw_model_path = Path(
     os.getenv("YOLO_MODEL_PATH") or os.getenv("MODEL_PATH", "vision/models/yolo26m.pt")
 )
-MODEL_PATH = str(_raw_model_path if _raw_model_path.is_absolute() else ROOT_DIR / _raw_model_path)
+MODEL_PATH = str(resolve_project_path(_raw_model_path))
 
 CONFIDENCE_THRESHOLD = float(
     os.getenv("YOLO_CONFIDENCE_THRESHOLD") or os.getenv("CONFIDENCE_THRESHOLD", "0.50")
@@ -100,9 +150,11 @@ FRAME_SKIP = int(os.getenv("FRAME_SKIP", "0"))
 _raw_imgsz = os.getenv("INFER_IMGSZ", "").strip()
 INFER_IMGSZ = int(_raw_imgsz) if _raw_imgsz.isdigit() and int(_raw_imgsz) > 0 else None
 
+FRONTEND_DIR = ROOT_DIR / "frontend"
+
 # Serverless has no NVIDIA GPU and a read-only project filesystem.
 # Skip model preload and write SQLite/invoices/images under /tmp.
-# PyTorch/CUDA/YOLO/OpenCV are not installed on Vercel (see pyproject.toml).
+# The production GPU backend must not be deployed as a Vercel function.
 if ON_VERCEL:
     YOLO_DEVICE = "cpu"
     DINO_DEVICE = "cpu"
