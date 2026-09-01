@@ -6,6 +6,7 @@ from typing import TypedDict
 import cv2
 import numpy as np
 
+from vision.detection.crop import crop_box
 from vision.detection.product_filter import filter_retail_detections
 from vision.detection.yolo_detector import YOLODetector, _color_for_class, get_yolo_detector
 from vision.recognition.embedding import EmbeddingRefiner
@@ -103,13 +104,7 @@ class TrackingPipeline:
 
 
 def _crop_box(frame: np.ndarray, bbox: list[float]) -> np.ndarray | None:
-    height, width = frame.shape[:2]
-    x1, y1, x2, y2 = (int(round(value)) for value in bbox)
-    x1, x2 = sorted((max(0, x1), min(width, x2)))
-    y1, y2 = sorted((max(0, y1), min(height, y2)))
-    if x2 - x1 < 8 or y2 - y1 < 8:
-        return None
-    return frame[y1:y2, x1:x2].copy()
+    return crop_box(frame, bbox)
 
 
 def _draw_track(frame: np.ndarray, track: TrackedProduct) -> None:

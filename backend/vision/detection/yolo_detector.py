@@ -3,7 +3,6 @@ from __future__ import annotations
 import threading
 import time
 from pathlib import Path
-from typing import NotRequired, TypedDict
 
 import cv2
 import numpy as np
@@ -11,19 +10,13 @@ from ultralytics import YOLO
 from ultralytics.utils.downloads import attempt_download_asset
 
 from backend.app.config import CONFIDENCE_THRESHOLD, INFER_IMGSZ, IOU_THRESHOLD, MODEL_PATH, ROOT_DIR, YOLO_DEVICE
+from vision.detection.types import Detection
 from vision.device import gpu_name, resolve_device
 
 OFFICIAL_MODEL_NAME = "yolo26m.pt"
 
 _lock = threading.Lock()
 _detector: "YOLODetector | None" = None
-
-
-class Detection(TypedDict):
-    class_id: int
-    confidence: float
-    bbox: list[float]
-    track_id: NotRequired[int | None]
 
 
 class YOLODetector:

@@ -10,7 +10,6 @@ import re
 from pathlib import Path
 from uuid import uuid4
 
-import cv2
 import numpy as np
 
 from backend.app.config import (
@@ -82,10 +81,11 @@ def save_product_image(
     image_type: str = "original",
 ) -> tuple[str, np.ndarray]:
     """Save JPEG bytes and return (storage_key, decoded BGR)."""
+    from vision.image_io import decode_bgr, encode_jpeg, write_jpeg
+
     if not image_bytes:
         raise StorageError("Image upload failed.")
-    array = np.frombuffer(image_bytes, dtype=np.uint8)
-    decoded = cv2.imdecode(array, cv2.IMREAD_COLOR)
+    decoded = decode_bgr(image_bytes)
     if decoded is None:
         raise StorageError("Invalid image.")
     safe_type = _SAFE_KEY.sub("_", (image_type or "original")[:32]) or "original"
@@ -96,14 +96,15 @@ def save_product_image(
         if not S3_BUCKET:
             raise StorageError("S3_BUCKET is not configured.")
         key = f"{S3_PREFIX}/{product_folder}/{filename}".lstrip("/")
-        ok, encoded = cv2.imencode(".jpg", decoded, [int(cv2.IMWRITE_JPEG_QUALITY), 92])
-        if not ok:
-            raise StorageError("Image save failed.")
+        try:
+            encoded = encode_jpeg(decoded, quality=92)
+        except Exception as extra:
+            raise StorageError("Image save failed.") from extra
         try:
             _s3_client().put_object(
                 Bucket=S3_BUCKET,
                 Key=key,
-                Body=encoded.tobytes(),
+                Body=encoded,
                 ContentType="image/jpeg",
             )
         except Exception as extra:
@@ -112,15 +113,17 @@ def save_product_image(
         cache = STORAGE_DIR / "products" / product_folder
         cache.mkdir(parents=True, exist_ok=True)
         absolute = cache / filename
-        absolute.write_bytes(encoded.tobytes())
+        absolute.write_bytes(encoded)
         return f"s3:{key}", decoded
 
     # Preferred layout: storage/products/product_<id>/… (also keep PRODUCT_IMAGE_DIR writable).
     product_folder = STORAGE_DIR / "products" / f"product_{int(product_id):03d}"
     product_folder.mkdir(parents=True, exist_ok=True)
     absolute = product_folder / filename
-    if not cv2.imwrite(str(absolute), decoded, [int(cv2.IMWRITE_JPEG_QUALITY), 92]):
-        raise StorageError("Image save failed.")
+    try:
+        write_jpeg(absolute, decoded, quality=92)
+    except Exception as extra:
+        raise StorageError("Image save failed.") from extra
     # Mirror under PRODUCT_IMAGE_DIR for older path lookups.
     legacy = PRODUCT_IMAGE_DIR / str(int(product_id))
     try:
@@ -169,3 +172,32 @@ def delete_product_image(storage_key: str) -> None:
     path = resolve_storage_path(storage_key)
     if path.exists() and path.is_file():
         path.unlink()
+
+
+class StorageService:
+    """Filesystem (local) or S3 object storage. Database stores keys/URLs, not blobs."""
+
+    def save_image(
+        self,
+        product_id: int,
+        image_bytes: bytes,
+        *,
+        image_type: str = "original",
+    ) -> tuple[str, np.ndarray]:
+        return save_product_image(product_id, image_bytes, image_type=image_type)
+
+    def get_image(self, storage_key: str) -> Path:
+        return get_product_image(storage_key)
+
+    def delete_image(self, storage_key: str) -> None:
+        delete_product_image(storage_key)
+
+
+_storage_service: StorageService | None = None
+
+
+def get_storage_service() -> StorageService:
+    global _storage_service
+    if _storage_service is None:
+        _storage_service = StorageService()
+    return _storage_service

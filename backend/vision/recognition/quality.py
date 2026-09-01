@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-import cv2
 import numpy as np
 
 from backend.app.config import (
@@ -49,9 +48,13 @@ def assess_image_quality(image: np.ndarray) -> QualityResult:
     if image.ndim == 2:
         gray = image
     else:
-        gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+        from vision.image_io import to_gray
 
-    blur = float(cv2.Laplacian(gray, cv2.CV_64F).var())
+        gray = to_gray(image)
+
+    from vision.image_io import laplacian_var
+
+    blur = laplacian_var(gray)
     brightness = float(np.mean(gray))
     contrast = float(np.std(gray))
 

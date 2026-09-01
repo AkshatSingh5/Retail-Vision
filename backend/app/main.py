@@ -1,29 +1,52 @@
 from __future__ import annotations
 
+import sys
 from contextlib import asynccontextmanager
+from pathlib import Path
+
+_APP_DIR = Path(__file__).resolve().parent
+_BACKEND_DIR = _APP_DIR.parent
+_ROOT_DIR = _BACKEND_DIR.parent
+for _path in (str(_ROOT_DIR), str(_BACKEND_DIR)):
+    if _path not in sys.path:
+        sys.path.insert(0, _path)
 
 from fastapi import FastAPI
+<<<<<<< HEAD
 from fastapi.responses import FileResponse
+=======
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse, Response
+>>>>>>> 88934153f0d17f13cd25be9aa4c8a60d9c74f082
 from fastapi.staticfiles import StaticFiles
 
 from backend.app.api.caption import router as caption_router
 from backend.app.api.cart import router as cart_router
 from backend.app.api.pos import router as pos_router
 from backend.app.api.products import router as products_router
+from backend.app.api.routes.health import router as health_router
 from backend.app.config import (
+    FRONTEND_DIR,
     INVOICE_DIR,
     PRELOAD_DINOV2,
     PRELOAD_FLORENCE,
     PRELOAD_YOLO,
     PROJECT_NAME,
     ROOT_DIR,
+    cors_allow_origins,
 )
 from backend.app.database import get_session_factory, init_db
 from backend.app.services.seed import seed_products_from_registry
 
 STATIC_DIR = ROOT_DIR / "backend" / "app" / "static"
+<<<<<<< HEAD
 POS_INDEX = STATIC_DIR / "pos" / "index.html"
 FAVICON = STATIC_DIR / "pos" / "favicon.png"
+=======
+POS_INDEX = FRONTEND_DIR / "index.html"
+if not POS_INDEX.is_file():
+    POS_INDEX = STATIC_DIR / "pos" / "index.html"
+>>>>>>> 88934153f0d17f13cd25be9aa4c8a60d9c74f082
 
 _runtime: dict[str, str | bool | None] = {
     "yolo": "not_loaded",
@@ -34,9 +57,7 @@ _runtime: dict[str, str | bool | None] = {
 
 
 def _print_backend_banner() -> None:
-    import torch
-
-    from vision.device import cuda_available, device_banner_name, gpu_name, resolve_device
+    from vision.device import cuda_available, device_banner_name, gpu_name, resolve_device, torch_version
 
     device = resolve_device("cuda", warn=False)
     cuda = cuda_available()
@@ -47,8 +68,10 @@ def _print_backend_banner() -> None:
     print(f"Device: {device_banner_name(device)}")
     print(f"GPU: {gpu}")
     print(f"CUDA: {cuda}")
-    print(f"PyTorch: {torch.__version__}")
-    if not cuda:
+    print(f"PyTorch: {torch_version() or 'not installed'}")
+    if torch_version() is None:
+        print("WARNING: PyTorch not installed. Vision scan uses color embeddings only.")
+    elif not cuda:
         print("WARNING: CUDA unavailable. Running on CPU.")
     print()
     print(f"YOLO26m: {_runtime['yolo']}")
@@ -64,17 +87,23 @@ def _print_backend_banner() -> None:
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
-    init_db()
-    INVOICE_DIR.mkdir(parents=True, exist_ok=True)
-    session = get_session_factory()()
     try:
-        seed_products_from_registry(session)
-        session.commit()
-    except Exception:
-        session.rollback()
-        raise
-    finally:
-        session.close()
+        init_db()
+        try:
+            INVOICE_DIR.mkdir(parents=True, exist_ok=True)
+        except OSError:
+            Path("/tmp/retail-vision/invoices").mkdir(parents=True, exist_ok=True)
+        session = get_session_factory()()
+        try:
+            seed_products_from_registry(session)
+            session.commit()
+        except Exception as extra:
+            session.rollback()
+            print(f"[startup] catalog seed skipped: {extra}")
+        finally:
+            session.close()
+    except Exception as extra:
+        print(f"[startup] database init skipped: {extra}")
 
     if PRELOAD_YOLO:
         try:
@@ -82,6 +111,7 @@ async def lifespan(_app: FastAPI):
 
             detector = get_yolo_detector()
             _runtime["yolo"] = f"Loaded ({detector.device})"
+            print(f"YOLO device: {detector.device}")
             print("YOLO26m: Loaded")
         except Exception as extra:
             _runtime["yolo"] = "FAILED"
@@ -94,6 +124,7 @@ async def lifespan(_app: FastAPI):
 
             embedder = get_dinov2()
             _runtime["dinov2"] = f"Loaded ({embedder.device})"
+            print(f"DINO device: {embedder.device}")
             print("DINOv2: Loaded")
         except Exception as extra:
             _runtime["dinov2"] = "FAILED"
@@ -107,47 +138,60 @@ async def lifespan(_app: FastAPI):
         except Exception as extra:
             print(f"[Florence-2] Startup preload failed: {extra}")
 
-    _print_backend_banner()
+    try:
+        _print_backend_banner()
+    except Exception as extra:
+        print(f"[startup] banner skipped: {extra}")
     yield
 
 
 app = FastAPI(title=PROJECT_NAME, lifespan=lifespan)
-# Existing POS paths (no /api prefix) — keep for the UI.
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=cors_allow_origins(),
+    allow_credentials=True,
+    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allow_headers=["*"],
+)
+app.include_router(health_router)
 app.include_router(products_router)
 app.include_router(cart_router)
 app.include_router(pos_router)
 app.include_router(caption_router)
-# Spec aliases: /api/products/*, /api/cart/*, /api/bills/generate, /api/caption
 app.include_router(products_router, prefix="/api")
 app.include_router(cart_router, prefix="/api")
 app.include_router(caption_router, prefix="/api")
-app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
+
+frontend_src = FRONTEND_DIR / "src"
+if frontend_src.is_dir():
+    app.mount("/src", StaticFiles(directory=frontend_src), name="frontend_src")
+if STATIC_DIR.is_dir():
+    app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 
 
 @app.get("/")
-def root() -> FileResponse:
-    return FileResponse(POS_INDEX, media_type="text/html")
+def root():
+    if POS_INDEX.is_file():
+        return FileResponse(POS_INDEX, media_type="text/html")
+    return {"project": PROJECT_NAME, "status": "running", "ui": "not_bundled"}
 
 
 @app.get("/favicon.ico", include_in_schema=False)
+<<<<<<< HEAD
 def favicon() -> FileResponse:
     return FileResponse(FAVICON, media_type="image/png")
+=======
+def favicon() -> Response:
+    return Response(status_code=204)
+>>>>>>> 88934153f0d17f13cd25be9aa4c8a60d9c74f082
 
 
 @app.get("/api/health")
-def health() -> dict:
-    import torch
-
-    from vision.device import cuda_available, gpu_name, resolve_device
-
-    device = resolve_device("cuda", warn=False)
+def api_health() -> dict:
+    """Diagnostic status. Does not load YOLO/DINOv2; reports already-loaded runtime."""
     return {
         "project": PROJECT_NAME,
-        "status": "running",
-        "device": device,
-        "cuda": cuda_available(),
-        "gpu": gpu_name(),
-        "pytorch": torch.__version__,
+        "status": "ok",
         "yolo26m": _runtime["yolo"],
         "dinov2": _runtime["dinov2"],
     }

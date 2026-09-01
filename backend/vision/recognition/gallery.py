@@ -16,7 +16,6 @@ import logging
 from dataclasses import dataclass
 from pathlib import Path
 
-import cv2
 import numpy as np
 from sqlalchemy import select
 
@@ -58,14 +57,13 @@ def _color_layout_embedding(image: np.ndarray) -> list[float]:
     prepared = prepare_product_image(image)
     size = prepared.shape[0]
 
-    hsv = cv2.cvtColor(prepared, cv2.COLOR_BGR2HSV)
-    lab = cv2.cvtColor(prepared, cv2.COLOR_BGR2LAB)
+    from vision.image_io import bgr_to_hsv, bgr_to_lab, calc_hist, edge_map, to_gray
 
-    hist_hsv = cv2.calcHist([hsv], [0, 1, 2], None, [18, 8, 8], [0, 180, 0, 256, 0, 256])
-    hist_hsv = cv2.normalize(hist_hsv, hist_hsv).flatten().astype(np.float32)
+    hsv = bgr_to_hsv(prepared)
+    lab = bgr_to_lab(prepared)
 
-    hist_lab = cv2.calcHist([lab], [1, 2], None, [12, 12], [0, 256, 0, 256])
-    hist_lab = cv2.normalize(hist_lab, hist_lab).flatten().astype(np.float32)
+    hist_hsv = calc_hist(hsv, [0, 1, 2], [18, 8, 8], [0, 180, 0, 256, 0, 256])
+    hist_lab = calc_hist(lab, [1, 2], [12, 12], [0, 256, 0, 256])
 
     cells: list[float] = []
     grid = 4
@@ -84,11 +82,10 @@ def _color_layout_embedding(image: np.ndarray) -> list[float]:
             )
     spatial = np.asarray(cells, dtype=np.float32)
 
-    gray = cv2.cvtColor(prepared, cv2.COLOR_BGR2GRAY)
-    edges = cv2.Canny(gray, 50, 140).astype(np.float32) / 255.0
-    edge_vec = cv2.resize(edges, (16, 16), interpolation=cv2.INTER_AREA).flatten()
+    gray = to_gray(prepared)
+    edge_vec = edge_map(gray, (16, 16))
 
-    hue_hist = cv2.calcHist([hsv], [0], None, [24], [0, 180]).flatten().astype(np.float32)
+    hue_hist = calc_hist(hsv, [0], [24], [0, 180])
     hue_hist = hue_hist / (float(hue_hist.sum()) + 1e-6)
 
     vector = np.concatenate(
@@ -109,9 +106,13 @@ def _color_layout_embedding(image: np.ndarray) -> list[float]:
 def crop_embedding(image: np.ndarray) -> list[float]:
     """Visual embedding for one product crop (DINOv2 or color backend)."""
     if EMBEDDING_BACKEND == "dinov2":
-        from vision.recognition.dinov2 import dinov2_embed
+        try:
+            from vision.recognition.dinov2 import dinov2_embed
 
-        return dinov2_embed(image)
+            return dinov2_embed(image)
+        except ImportError:
+            logger.warning("DINOv2/PyTorch is not installed; using color embeddings.")
+            return _color_layout_embedding(image)
     return _color_layout_embedding(image)
 
 
@@ -135,13 +136,15 @@ def embedding_variants(image: np.ndarray) -> list[list[float]]:
             x0 = max(0, (width - cw) // 2)
             variants.append(image[y0 : y0 + ch, x0 : x0 + cw].copy())
     pad = max(8, min(height, width) // 8)
-    variants.append(cv2.copyMakeBorder(image, pad, pad, pad, pad, cv2.BORDER_REPLICATE))
+    from vision.image_io import replicate_border, scale_abs
+
+    variants.append(replicate_border(image, pad))
     if height > 48 and width > 48:
         y0, y1 = height // 12, height - height // 12
         x0, x1 = width // 12, width - width // 12
         variants.append(image[y0:y1, x0:x1].copy())
-    brighter = cv2.convertScaleAbs(image, alpha=1.12, beta=8)
-    darker = cv2.convertScaleAbs(image, alpha=0.88, beta=-8)
+    brighter = scale_abs(image, 1.12, 8)
+    darker = scale_abs(image, 0.88, -8)
     variants.extend([brighter, darker])
 
     vectors: list[list[float]] = []
@@ -183,7 +186,9 @@ def _load_image(path_value: str | None) -> np.ndarray | None:
         path = ROOT_DIR / path
     if not path.exists():
         return None
-    return cv2.imread(str(path), cv2.IMREAD_COLOR)
+    from vision.image_io import read_bgr
+
+    return read_bgr(path)
 
 
 @dataclass(frozen=True)

@@ -4,7 +4,6 @@ import threading
 import time
 from typing import Any
 
-import cv2
 import numpy as np
 
 from backend.app.config import (
@@ -204,24 +203,30 @@ class CameraHub:
             self.pipeline.manager.bind_product(int(track_id), payload)
 
     def _capture_crops(self, frame) -> None:
-        from vision.tracking.pipeline import _crop_box
+        from vision.detection.crop import crop_box
 
         if self.pipeline is None:
             return
         for track in self.pipeline.manager.active_tracks():
-            crop = _crop_box(frame, track.bbox)
+            crop = crop_box(frame, track.bbox)
             if crop is None:
                 continue
-            ok, encoded = cv2.imencode(".jpg", crop, [int(cv2.IMWRITE_JPEG_QUALITY), 90])
-            if ok:
-                self._crops[int(track.track_id)] = encoded.tobytes()
+            try:
+                from vision.image_io import encode_jpeg
+
+                self._crops[int(track.track_id)] = encode_jpeg(crop, quality=90)
+            except Exception:
+                continue
 
     def _set_jpeg(self, frame: np.ndarray) -> None:
-        ok, encoded = cv2.imencode(".jpg", frame, [int(cv2.IMWRITE_JPEG_QUALITY), 80])
-        if not ok:
+        try:
+            from vision.image_io import encode_jpeg
+
+            payload = encode_jpeg(frame, quality=80)
+        except Exception:
             return
         with self._lock:
-            self._jpeg = encoded.tobytes()
+            self._jpeg = payload
 
     def _ensure_pipeline(self) -> None:
         if self.pipeline is not None:
@@ -408,27 +413,18 @@ class CameraHub:
 
 
 def _placeholder_frame(message: str) -> np.ndarray:
-    frame = np.full((720, 1280, 3), 18, dtype=np.uint8)
-    y = 300
-    for line in message.split("\n"):
-        (width, _height), _ = cv2.getTextSize(line, cv2.FONT_HERSHEY_SIMPLEX, 1.0, 2)
-        cv2.putText(
-            frame,
-            line,
-            ((1280 - width) // 2, y),
-            cv2.FONT_HERSHEY_SIMPLEX,
-            1.0,
-            (232, 197, 71),
-            2,
-            cv2.LINE_AA,
-        )
-        y += 44
-    return frame
+    from vision.image_io import draw_labeled_canvas
+
+    return draw_labeled_canvas(message)
 
 
 def _placeholder_jpeg(message: str) -> bytes:
-    ok, encoded = cv2.imencode(".jpg", _placeholder_frame(message))
-    return encoded.tobytes() if ok else b""
+    try:
+        from vision.image_io import encode_jpeg
+
+        return encode_jpeg(_placeholder_frame(message), quality=80)
+    except Exception:
+        return b""
 
 
 _hub: CameraHub | None = None

@@ -5,7 +5,6 @@ Both pipelines must use the same BGR → prepare path so embeddings stay compara
 
 from __future__ import annotations
 
-import cv2
 import numpy as np
 
 EMBED_SIZE = 96
@@ -15,28 +14,9 @@ def prepare_product_image(image: np.ndarray, size: int = EMBED_SIZE) -> np.ndarr
     """Normalize a product crop/frame for embedding (OpenCV BGR in/out)."""
     if image is None or getattr(image, "size", 0) == 0:
         raise ValueError("Empty product image.")
-    frame = image
-    if frame.ndim == 2:
-        frame = cv2.cvtColor(frame, cv2.COLOR_GRAY2BGR)
-    elif frame.shape[2] == 4:
-        frame = cv2.cvtColor(frame, cv2.COLOR_BGRA2BGR)
-    elif frame.shape[2] != 3:
-        raise ValueError("Unsupported product image channels.")
+    from vision.image_io import letterbox_bgr
 
-    height, width = frame.shape[:2]
-    if height < 8 or width < 8:
-        raise ValueError("Product crop is too small.")
-
-    # Letterbox to square so aspect ratio does not distort pack layout.
-    scale = size / max(height, width)
-    new_w = max(1, int(round(width * scale)))
-    new_h = max(1, int(round(height * scale)))
-    resized = cv2.resize(frame, (new_w, new_h), interpolation=cv2.INTER_AREA)
-    canvas = np.zeros((size, size, 3), dtype=np.uint8)
-    y0 = (size - new_h) // 2
-    x0 = (size - new_w) // 2
-    canvas[y0 : y0 + new_h, x0 : x0 + new_w] = resized
-    return canvas
+    return letterbox_bgr(image, size)
 
 
 def pad_bbox(

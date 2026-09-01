@@ -7,7 +7,7 @@ from sqlalchemy import create_engine, event
 from sqlalchemy.engine import Engine, make_url
 from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
 
-from backend.app.config import DATABASE_URL, ROOT_DIR
+from backend.app.config import DATABASE_URL, ON_VERCEL, ROOT_DIR
 
 
 class Base(DeclarativeBase):
@@ -19,15 +19,28 @@ SessionLocal: sessionmaker[Session] | None = None
 
 
 def resolve_database_url(url: str | None = None) -> str:
-    """Make SQLite paths absolute; leave PostgreSQL URLs unchanged."""
+    """Make SQLite paths absolute; leave PostgreSQL URLs unchanged.
+
+    On Vercel, localhost Postgres is unreachable, so fall back to /tmp SQLite.
+    """
     raw = url or DATABASE_URL
     parsed = make_url(raw)
+    if ON_VERCEL:
+        host = (parsed.host or "").lower()
+        if (not parsed.drivername.startswith("sqlite")) and host in {"", "localhost", "127.0.0.1", "::1"}:
+            db_path = Path("/tmp/retail-vision/retail_vision.db")
+            db_path.parent.mkdir(parents=True, exist_ok=True)
+            return f"sqlite:///{db_path.as_posix()}"
     if not parsed.drivername.startswith("sqlite"):
         return raw
     database = parsed.database
     if not database or database == ":memory:":
         return raw
     db_path = Path(database)
+    if ON_VERCEL:
+        db_path = Path("/tmp/retail-vision") / db_path.name
+        db_path.parent.mkdir(parents=True, exist_ok=True)
+        return f"sqlite:///{db_path.as_posix()}"
     if not db_path.is_absolute():
         db_path = (ROOT_DIR / db_path).resolve()
     return f"sqlite:///{db_path.as_posix()}"
@@ -65,7 +78,10 @@ def get_engine(url: str | None = None) -> Engine:
 
 def get_session_factory() -> sessionmaker[Session]:
     if SessionLocal is None:
-        get_engine()
+        if ON_VERCEL:
+            init_db()
+        else:
+            get_engine()
     assert SessionLocal is not None
     return SessionLocal
 
@@ -97,6 +113,24 @@ def init_db(url: str | None = None) -> Engine:
         import logging
 
         logging.getLogger(__name__).warning("pgvector setup skipped: %s", extra)
+    try:
+        from backend.app.services.seed import seed_products_from_registry
+
+        if SessionLocal is None:
+            return engine
+        session = SessionLocal()
+        try:
+            seed_products_from_registry(session)
+            session.commit()
+        except Exception as extra:
+            import logging
+
+            session.rollback()
+            logging.getLogger(__name__).warning("catalog seed skipped: %s", extra)
+        finally:
+            session.close()
+    except Exception:
+        pass
     return engine
 
 

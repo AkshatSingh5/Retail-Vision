@@ -1,0 +1,1 @@
+window.RETAIL_VISION_API_URL = "";

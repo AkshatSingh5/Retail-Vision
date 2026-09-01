@@ -5,11 +5,13 @@ import time
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import FileResponse, Response, StreamingResponse
 
-from backend.app.config import ROOT_DIR
+from backend.app.config import FRONTEND_DIR, ROOT_DIR
 from backend.app.services.camera_hub import CameraControlError, get_camera_hub
 
 router = APIRouter(tags=["pos"])
-POS_INDEX = ROOT_DIR / "backend" / "app" / "static" / "pos" / "index.html"
+POS_INDEX = FRONTEND_DIR / "index.html"
+if not POS_INDEX.is_file():
+    POS_INDEX = ROOT_DIR / "backend" / "app" / "static" / "pos" / "index.html"
 
 
 def _mjpeg():

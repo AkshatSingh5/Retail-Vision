@@ -2,10 +2,15 @@
 
 from __future__ import annotations
 
-import torch
+try:
+    import torch
+except ImportError:
+    torch = None  # type: ignore[assignment]
 
 
 def cuda_available() -> bool:
+    if torch is None:
+        return False
     return bool(torch.cuda.is_available())
 
 
@@ -18,6 +23,8 @@ def gpu_name() -> str | None:
 def resolve_device(preference: str | None = None, *, warn: bool = True) -> str:
     """Honor YOLO_DEVICE / DINO_DEVICE. Prefer CUDA; never hide a missing GPU."""
     pref = (preference or "").strip().lower()
+    if torch is None:
+        return "cpu"
     if pref in {"cpu"}:
         if warn and cuda_available():
             print("WARNING: Device preference is CPU while CUDA is available.")
@@ -43,3 +50,9 @@ def resolve_device(preference: str | None = None, *, warn: bool = True) -> str:
 
 def device_banner_name(device: str) -> str:
     return "CUDA" if str(device).startswith("cuda") else "CPU"
+
+
+def torch_version() -> str | None:
+    if torch is None:
+        return None
+    return str(torch.__version__)
