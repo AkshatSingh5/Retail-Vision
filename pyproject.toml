@@ -5,7 +5,8 @@ description = "AI-powered retail product detection and automatic billing"
 requires-python = ">=3.12"
 # Vercel installs only this list (uv sync, no extras). Keep it web-only.
 # CUDA PyTorch + ultralytics + transformers were ~5.2 GB and exceeded the
-# 500 MB (and even 5 GB Large Function) bundle limit.
+# 500 MB (and even 5 GB Large Function) bundle limit. OpenCV is also omitted:
+# it crashes Vercel (missing libGL/libgthread). Scan uses Pillow + color embeddings.
 dependencies = [
     "annotated-doc==0.0.5",
     "annotated-types==0.8.0",
@@ -24,7 +25,6 @@ dependencies = [
     "Jinja2==3.1.6",
     "MarkupSafe==3.0.3",
     "numpy==2.5.2",
-    "opencv-python-headless==5.0.0.93",
     "packaging==26.3",
     "pgvector>=0.3.0",
     "pillow==12.3.0",

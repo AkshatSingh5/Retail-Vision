@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 from fastapi import FastAPI
 from fastapi.responses import FileResponse, Response
@@ -64,17 +65,23 @@ def _print_backend_banner() -> None:
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
-    init_db()
-    INVOICE_DIR.mkdir(parents=True, exist_ok=True)
-    session = get_session_factory()()
     try:
-        seed_products_from_registry(session)
-        session.commit()
-    except Exception:
-        session.rollback()
-        raise
-    finally:
-        session.close()
+        init_db()
+        try:
+            INVOICE_DIR.mkdir(parents=True, exist_ok=True)
+        except OSError:
+            Path("/tmp/retail-vision/invoices").mkdir(parents=True, exist_ok=True)
+        session = get_session_factory()()
+        try:
+            seed_products_from_registry(session)
+            session.commit()
+        except Exception as extra:
+            session.rollback()
+            print(f"[startup] catalog seed skipped: {extra}")
+        finally:
+            session.close()
+    except Exception as extra:
+        print(f"[startup] database init skipped: {extra}")
 
     if PRELOAD_YOLO:
         try:
@@ -107,7 +114,10 @@ async def lifespan(_app: FastAPI):
         except Exception as extra:
             print(f"[Florence-2] Startup preload failed: {extra}")
 
-    _print_backend_banner()
+    try:
+        _print_backend_banner()
+    except Exception as extra:
+        print(f"[startup] banner skipped: {extra}")
     yield
 
 
@@ -121,12 +131,15 @@ app.include_router(caption_router)
 app.include_router(products_router, prefix="/api")
 app.include_router(cart_router, prefix="/api")
 app.include_router(caption_router, prefix="/api")
-app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
+if STATIC_DIR.is_dir():
+    app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 
 
 @app.get("/")
-def root() -> FileResponse:
-    return FileResponse(POS_INDEX, media_type="text/html")
+def root():
+    if POS_INDEX.is_file():
+        return FileResponse(POS_INDEX, media_type="text/html")
+    return {"project": PROJECT_NAME, "status": "running", "ui": "not_bundled"}
 
 
 @app.get("/favicon.ico", include_in_schema=False)

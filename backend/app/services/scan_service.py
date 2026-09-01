@@ -17,7 +17,6 @@ from dataclasses import dataclass
 from typing import Any
 from uuid import uuid4
 
-import cv2
 import numpy as np
 from sqlalchemy.orm import Session
 
@@ -135,30 +134,34 @@ def validate_image_bytes(image_bytes: bytes, content_type: str | None = None) ->
 
             if mime not in ALLOWED_IMAGE_MIME:
                 raise ScanError("Invalid image.")
-    array = np.frombuffer(image_bytes, dtype=np.uint8)
-    decoded = cv2.imdecode(array, cv2.IMREAD_COLOR)
-    if decoded is None:
-        raise ScanError("Invalid image.")
+    _decode(image_bytes)
     return image_bytes
 
 
 def _decode(image_bytes: bytes) -> np.ndarray:
-    array = np.frombuffer(image_bytes, dtype=np.uint8)
-    frame = cv2.imdecode(array, cv2.IMREAD_COLOR)
+    from vision.image_io import decode_bgr
+
+    frame = decode_bgr(image_bytes)
     if frame is None:
         raise ScanError("Invalid image.")
     return frame
 
 
 def _encode_jpeg(frame: np.ndarray, quality: int = 90) -> bytes:
-    ok, encoded = cv2.imencode(".jpg", frame, [int(cv2.IMWRITE_JPEG_QUALITY), quality])
-    if not ok:
-        raise ScanError("Image processing failed.")
-    return encoded.tobytes()
+    from vision.image_io import encode_jpeg
+
+    try:
+        return encode_jpeg(frame, quality=quality)
+    except Exception as extra:
+        raise ScanError("Image processing failed.") from extra
 
 
 def _get_detector():
     global _detector
+    from backend.app.config import ON_VERCEL
+
+    if ON_VERCEL:
+        raise RuntimeError("YOLO is not installed on Vercel; using center-crop recognition.")
     try:
         from backend.app.services.camera_hub import get_camera_hub
 
@@ -255,17 +258,24 @@ def _save_debug_crops(frame: np.ndarray, crop: np.ndarray | None, meta: dict, sc
     if not (SCAN_DEBUG_CROPS or RECOGNITION_DEBUG):
         return None
     try:
+        from vision.image_io import write_jpeg
+
         folder = STORAGE_DIR / "debug" / "scans" / scan_token
         folder.mkdir(parents=True, exist_ok=True)
-        cv2.imwrite(str(folder / "original_camera_image.jpg"), frame)
+        write_jpeg(folder / "original_camera_image.jpg", frame)
         if crop is not None:
-            cv2.imwrite(str(folder / "product_crop.jpg"), crop)
+            write_jpeg(folder / "product_crop.jpg", crop)
         bbox = meta.get("bbox") or []
         annotated = frame.copy()
         if len(bbox) == 4:
             x1, y1, x2, y2 = (int(round(v)) for v in bbox)
-            cv2.rectangle(annotated, (x1, y1), (x2, y2), (0, 255, 0), 2)
-        cv2.imwrite(str(folder / "yolo_detection.jpg"), annotated)
+            x1, x2 = sorted((max(0, x1), min(annotated.shape[1] - 1, x2)))
+            y1, y2 = sorted((max(0, y1), min(annotated.shape[0] - 1, y2)))
+            annotated[y1 : y1 + 2, x1:x2] = (0, 255, 0)
+            annotated[y2 - 1 : y2 + 1, x1:x2] = (0, 255, 0)
+            annotated[y1:y2, x1 : x1 + 2] = (0, 255, 0)
+            annotated[y1:y2, x2 - 1 : x2 + 1] = (0, 255, 0)
+        write_jpeg(folder / "yolo_detection.jpg", annotated)
         return folder
     except Exception as extra:
         logger.debug("Scan debug crop save failed: %s", extra)
@@ -522,7 +532,7 @@ def recognize_frame(
             )
             if usable:
                 print(
-                    "[YOLO] 0 detections → using center scan-area crop for recognition "
+                    "[YOLO] 0 detections -> using center scan-area crop for recognition "
                     f"({center_crop.shape[1]}x{center_crop.shape[0]})"
                 )
                 yolo_candidates = [
@@ -542,7 +552,7 @@ def recognize_frame(
             else:
                 print(
                     "[YOLO] 0 detections and center crop unusable "
-                    f"(quality={getattr(crop_q, 'reason', None)}) → no_product"
+                    f"(quality={getattr(crop_q, 'reason', None)}) -> no_product"
                 )
 
         if detections_count == 0:

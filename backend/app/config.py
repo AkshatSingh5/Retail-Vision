@@ -6,8 +6,8 @@ from dotenv import load_dotenv
 ROOT_DIR = Path(__file__).resolve().parents[2]
 load_dotenv(ROOT_DIR / ".env")
 
-# Vercel sets VERCEL=1 on every serverless build and request.
-ON_VERCEL = os.getenv("VERCEL") == "1"
+# Vercel sets VERCEL=1 (and VERCEL_ENV) on every serverless build and request.
+ON_VERCEL = os.getenv("VERCEL") in {"1", "true", "TRUE"} or bool(os.getenv("VERCEL_ENV"))
 
 PROJECT_NAME = "Retail Vision"
 
@@ -102,14 +102,14 @@ INFER_IMGSZ = int(_raw_imgsz) if _raw_imgsz.isdigit() and int(_raw_imgsz) > 0 el
 
 # Serverless has no NVIDIA GPU and a read-only project filesystem.
 # Skip model preload and write SQLite/invoices/images under /tmp.
-# PyTorch/CUDA/YOLO are not installed on Vercel (see pyproject.toml).
+# PyTorch/CUDA/YOLO/OpenCV are not installed on Vercel (see pyproject.toml).
 if ON_VERCEL:
     YOLO_DEVICE = "cpu"
     DINO_DEVICE = "cpu"
     PRELOAD_YOLO = False
     PRELOAD_DINOV2 = False
     PRELOAD_FLORENCE = False
-    EMBEDDING_BACKEND = os.getenv("EMBEDDING_BACKEND", "color").strip().lower()
+    EMBEDDING_BACKEND = "color"
     _vercel_tmp = Path("/tmp/retail-vision")
     INVOICE_DIR = _vercel_tmp / "invoices"
     PRODUCT_IMAGE_DIR = _vercel_tmp / "products" / "images"

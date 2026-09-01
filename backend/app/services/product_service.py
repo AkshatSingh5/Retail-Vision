@@ -177,10 +177,9 @@ def find_similar_product(
     if query is None:
         if not image_bytes:
             return None
-        import cv2
+        from vision.image_io import decode_bgr
 
-        array = np.frombuffer(image_bytes, dtype=np.uint8)
-        frame = cv2.imdecode(array, cv2.IMREAD_COLOR)
+        frame = decode_bgr(image_bytes)
         if frame is None:
             return None
         query = crop_embedding(frame)

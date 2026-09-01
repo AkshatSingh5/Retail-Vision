@@ -17,6 +17,8 @@ def seed_products_from_registry(session: Session, path=REGISTRY_PATH) -> int:
 
     Prices live in the seed/registry file and the database — never in detector code.
     """
+    if not path.exists():
+        return 0
     existing = session.scalar(select(func.count()).select_from(Product)) or 0
     if existing:
         return 0
