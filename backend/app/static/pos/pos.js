@@ -532,7 +532,7 @@
   }
 
   async function stopHubCamera() {
-    if (!hubStartedByClient || !backendIsConfigured()) {
+    if (!hubStartedByClient || !backendIsConfigured() || backendUnavailable) {
       hubStartedByClient = false;
       hubVisionStatus.camera_active = false;
       return;
@@ -871,6 +871,9 @@
       }
     } catch (err) {
       console.error("Scan error:", err);
+      if (err && (err.status === 404 || err.status === 0)) {
+        markBackendUnavailable(err);
+      }
       const msg =
         err && (err.status === 404 || err.status === 0)
           ? missingBackendMessage()
@@ -1522,10 +1525,33 @@
     }
   }
 
+  async function probeBackend() {
+    const paths = ["/health", "/api/health"];
+    for (const path of paths) {
+      try {
+        const response = await fetch(apiUrl(path), { method: "GET" });
+        if (!response.ok) continue;
+        const type = response.headers.get("content-type") || "";
+        if (!type.includes("application/json")) continue;
+        const payload = await response.json();
+        if (payload && (payload.status === "ok" || payload.project)) return true;
+      } catch (_e) {
+        /* try the next health path */
+      }
+    }
+    return false;
+  }
+
   async function boot() {
     initEventListeners();
     if (!backendIsConfigured()) {
       markBackendUnavailable(new Error("API_BASE_URL missing"));
+      setPosState(POS_STATES.CAMERA_OFFLINE);
+      return;
+    }
+    const reachable = await probeBackend();
+    if (!reachable) {
+      markBackendUnavailable(new Error("404"));
       setPosState(POS_STATES.CAMERA_OFFLINE);
       return;
     }

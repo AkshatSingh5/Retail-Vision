@@ -1,5 +1,7 @@
 (function (global) {
   const STORAGE_KEY = "RETAIL_VISION_API_URL";
+  const LOCAL_BACKEND = "http://127.0.0.1:8000";
+  const LOCAL_UI_PORTS = new Set(["3000", "4173", "5173", "5500", "8080"]);
 
   function normalize(url) {
     return String(url || "").trim().replace(/\/$/, "");
@@ -13,8 +15,29 @@
     }
   }
 
+  function pageHost() {
+    return ((global.location && global.location.hostname) || "").toLowerCase();
+  }
+
+  function pagePort() {
+    return String((global.location && global.location.port) || "");
+  }
+
   function isVercelHost(host) {
     return host === "vercel.app" || host.endsWith(".vercel.app");
+  }
+
+  function isStaticFrontendHost() {
+    const host = pageHost();
+    if (!host) return false;
+    if (isVercelHost(host)) return true;
+    if (host.endsWith(".netlify.app") || host.endsWith(".github.io") || host.endsWith(".pages.dev")) {
+      return true;
+    }
+    if ((host === "localhost" || host === "127.0.0.1") && LOCAL_UI_PORTS.has(pagePort())) {
+      return true;
+    }
+    return false;
   }
 
   function isUsableBackend(url) {
@@ -57,8 +80,16 @@
     return normalize(fromWindow);
   }
 
+  function readLocalBackendFallback() {
+    const host = pageHost();
+    if (host !== "localhost" && host !== "127.0.0.1") return "";
+    if (!LOCAL_UI_PORTS.has(pagePort())) return "";
+    if (global.location && global.location.protocol === "https:") return "";
+    return LOCAL_BACKEND;
+  }
+
   function readApiBase() {
-    const candidates = [readQueryOverride(), readBakedIn(), readStored()];
+    const candidates = [readQueryOverride(), readBakedIn(), readStored(), readLocalBackendFallback()];
     for (const url of candidates) {
       if (isUsableBackend(url)) return url;
     }
@@ -68,8 +99,7 @@
   const API_BASE_URL = readApiBase();
 
   function isRemoteStaticHost() {
-    const host = ((global.location && global.location.hostname) || "").toLowerCase();
-    return isVercelHost(host);
+    return isStaticFrontendHost();
   }
 
   function isConfigured() {

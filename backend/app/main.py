@@ -156,6 +156,7 @@ app.include_router(pos_router)
 app.include_router(caption_router)
 app.include_router(products_router, prefix="/api")
 app.include_router(cart_router, prefix="/api")
+app.include_router(pos_router, prefix="/api")
 app.include_router(caption_router, prefix="/api")
 
 frontend_src = FRONTEND_DIR / "src"
