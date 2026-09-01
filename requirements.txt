@@ -1,5 +1,10 @@
-# Retail Vision — Python dependencies
+# Retail Vision — local / GPU machine dependencies
 # Reproduce with: pip install -r requirements.txt
+#
+# Vercel does NOT use this file when pyproject.toml is present. The Vercel
+# function installs only [project].dependencies (no torch / ultralytics).
+# Installing CUDA PyTorch on Vercel produced a 5.2 GB bundle and failed the
+# 500 MB function size limit.
 #
 # YOLO26m (official, verified 2026-08-20):
 #   Package: ultralytics==8.4.123

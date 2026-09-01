@@ -35,12 +35,12 @@ from backend.app.models.product import Product
 from backend.app.models.scan_log import ScanLog
 from backend.app.schemas.product import public_image_url, serialize_money
 from backend.app.services.product_service import ProductNotFoundError, get_product
+from vision.detection.crop import crop_box
 from vision.detection.product_filter import filter_scan_detections, is_retail_trained_model, scan_crop_priority
 from vision.recognition.gallery import EMBEDDING_VERSION, crop_embedding, get_gallery
 from vision.recognition.preprocess import pad_bbox
 from vision.recognition.quality import assess_image_quality
 from vision.recognition.vector_bridge import current_model_name
-from vision.tracking.pipeline import _crop_box
 
 logger = logging.getLogger(__name__)
 
@@ -314,7 +314,7 @@ def _detect_crops(frame: np.ndarray) -> tuple[list[tuple[np.ndarray, dict]], dic
     scored: list[tuple[float, np.ndarray, dict]] = []
     for item in detections:
         padded = pad_bbox(item["bbox"], frame.shape, pad_ratio=0.08)
-        crop = _crop_box(frame, padded)
+        crop = crop_box(frame, padded)
         if crop is None:
             continue
         meta = dict(item)

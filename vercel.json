@@ -3,7 +3,7 @@
   "functions": {
     "backend/app/main.py": {
       "maxDuration": 60,
-      "excludeFiles": "{dataset/**,reports/**,scripts/**,products/images/**,storage/**,invoices/**,.venv/**,**/*.pt,**/*.safetensors}"
+      "excludeFiles": "{dataset/**,reports/**,scripts/**,tests/**,runs/**,logs/**,products/images/**,storage/**,invoices/**,.venv/**,huggingface/**,.hf_home/**,.cache/**,**/*.pt,**/*.pth,**/*.onnx,**/*.safetensors,**/*.bin}"
     }
   }
 }

@@ -109,9 +109,13 @@ def _color_layout_embedding(image: np.ndarray) -> list[float]:
 def crop_embedding(image: np.ndarray) -> list[float]:
     """Visual embedding for one product crop (DINOv2 or color backend)."""
     if EMBEDDING_BACKEND == "dinov2":
-        from vision.recognition.dinov2 import dinov2_embed
+        try:
+            from vision.recognition.dinov2 import dinov2_embed
 
-        return dinov2_embed(image)
+            return dinov2_embed(image)
+        except ImportError:
+            logger.warning("DINOv2/PyTorch is not installed; using color embeddings.")
+            return _color_layout_embedding(image)
     return _color_layout_embedding(image)
 
 

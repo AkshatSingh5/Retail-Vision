@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from vision.detection.yolo_detector import Detection
+from vision.detection.types import Detection
 from vision.recognition.identity import IdentifiedDetection
 
 

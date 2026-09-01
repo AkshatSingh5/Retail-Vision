@@ -3,7 +3,7 @@ from __future__ import annotations
 import re
 from functools import lru_cache
 
-from vision.detection.yolo_detector import Detection
+from vision.detection.types import Detection
 
 # Human / scene classes that must never enter the retail pipeline.
 _NON_PRODUCT_EXACT = frozenset(

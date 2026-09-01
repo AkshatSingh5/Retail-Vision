@@ -102,12 +102,14 @@ INFER_IMGSZ = int(_raw_imgsz) if _raw_imgsz.isdigit() and int(_raw_imgsz) > 0 el
 
 # Serverless has no NVIDIA GPU and a read-only project filesystem.
 # Skip model preload and write SQLite/invoices/images under /tmp.
+# PyTorch/CUDA/YOLO are not installed on Vercel (see pyproject.toml).
 if ON_VERCEL:
     YOLO_DEVICE = "cpu"
     DINO_DEVICE = "cpu"
     PRELOAD_YOLO = False
     PRELOAD_DINOV2 = False
     PRELOAD_FLORENCE = False
+    EMBEDDING_BACKEND = os.getenv("EMBEDDING_BACKEND", "color").strip().lower()
     _vercel_tmp = Path("/tmp/retail-vision")
     INVOICE_DIR = _vercel_tmp / "invoices"
     PRODUCT_IMAGE_DIR = _vercel_tmp / "products" / "images"

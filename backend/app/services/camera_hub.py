@@ -204,12 +204,12 @@ class CameraHub:
             self.pipeline.manager.bind_product(int(track_id), payload)
 
     def _capture_crops(self, frame) -> None:
-        from vision.tracking.pipeline import _crop_box
+        from vision.detection.crop import crop_box
 
         if self.pipeline is None:
             return
         for track in self.pipeline.manager.active_tracks():
-            crop = _crop_box(frame, track.bbox)
+            crop = crop_box(frame, track.bbox)
             if crop is None:
                 continue
             ok, encoded = cv2.imencode(".jpg", crop, [int(cv2.IMWRITE_JPEG_QUALITY), 90])

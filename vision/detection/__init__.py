@@ -1,3 +1,6 @@
-from vision.detection.yolo_detector import Detection, YOLODetector
+from vision.detection.types import Detection
 
-__all__ = ["Detection", "YOLODetector"]
+# Do not import YOLODetector here. It pulls ultralytics/torch, which must stay
+# out of the Vercel serverless bundle.
+
+__all__ = ["Detection"]

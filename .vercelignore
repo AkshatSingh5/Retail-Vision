@@ -1,0 +1,24 @@
+# Keep the Vercel function bundle small. CUDA wheels, datasets, and
+# local caches must never ship with the serverless function.
+.venv/
+.cache/
+.hf_home/
+huggingface/
+dataset/
+reports/
+scripts/
+tests/
+runs/
+logs/
+storage/
+invoices/
+products/images/
+*.pt
+*.pth
+*.onnx
+*.safetensors
+*.bin
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.git/

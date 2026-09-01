@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import TypedDict
 
-from vision.detection.yolo_detector import Detection
+from vision.detection.types import Detection
 from vision.recognition.catalog import ProductCatalog, ProductIdentity, load_catalog
 from vision.recognition.embedding import EmbeddingRefiner
 from vision.recognition.gallery import get_gallery

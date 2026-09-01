@@ -12,6 +12,7 @@ from backend.app.api.pos import router as pos_router
 from backend.app.api.products import router as products_router
 from backend.app.config import (
     INVOICE_DIR,
+    ON_VERCEL,
     PRELOAD_DINOV2,
     PRELOAD_FLORENCE,
     PRELOAD_YOLO,
@@ -33,9 +34,7 @@ _runtime: dict[str, str | bool | None] = {
 
 
 def _print_backend_banner() -> None:
-    import torch
-
-    from vision.device import cuda_available, device_banner_name, gpu_name, resolve_device
+    from vision.device import cuda_available, device_banner_name, gpu_name, resolve_device, torch_version
 
     device = resolve_device("cuda", warn=False)
     cuda = cuda_available()
@@ -46,8 +45,10 @@ def _print_backend_banner() -> None:
     print(f"Device: {device_banner_name(device)}")
     print(f"GPU: {gpu}")
     print(f"CUDA: {cuda}")
-    print(f"PyTorch: {torch.__version__}")
-    if not cuda:
+    print(f"PyTorch: {torch_version() or 'not installed'}")
+    if torch_version() is None:
+        print("WARNING: PyTorch not installed. Vision scan uses color embeddings only.")
+    elif not cuda:
         print("WARNING: CUDA unavailable. Running on CPU.")
     print()
     print(f"YOLO26m: {_runtime['yolo']}")
@@ -136,18 +137,16 @@ def favicon() -> Response:
 
 @app.get("/api/health")
 def health() -> dict:
-    import torch
+    from vision.device import cuda_available, gpu_name, resolve_device, torch_version
 
-    from vision.device import cuda_available, gpu_name, resolve_device
-
-    device = resolve_device("cuda", warn=False)
+    device = resolve_device("cpu" if ON_VERCEL else "cuda", warn=False)
     return {
         "project": PROJECT_NAME,
         "status": "running",
         "device": device,
         "cuda": cuda_available(),
         "gpu": gpu_name(),
-        "pytorch": torch.__version__,
+        "pytorch": torch_version(),
         "yolo26m": _runtime["yolo"],
         "dinov2": _runtime["dinov2"],
     }
