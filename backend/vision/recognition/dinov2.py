@@ -25,7 +25,7 @@ class DinoV2Embedder:
     """Lazy DINOv2 visual embedder. Same model + preprocess for register and scan."""
 
     def __init__(self, model_id: str = DINOV2_MODEL) -> None:
-        from transformers import AutoImageProcessor, AutoModel
+        from transformers import AutoModel, AutoProcessor
 
         self.model_id = model_id
         self.device = resolve_device(DINO_DEVICE)
@@ -34,7 +34,7 @@ class DinoV2Embedder:
         if gpu:
             print(f"GPU: {gpu}")
         print(f"[DINOv2] Loading {model_id} on {self.device}...")
-        self.processor = AutoImageProcessor.from_pretrained(model_id)
+        self.processor = AutoProcessor.from_pretrained(model_id)
         self.model = AutoModel.from_pretrained(model_id)
         self.model.eval()
         self.model.to(self.device)
