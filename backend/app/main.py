@@ -29,15 +29,28 @@ from backend.app.config import (
     PRELOAD_YOLO,
     PROJECT_NAME,
     ROOT_DIR,
+    cors_allow_origin_regex,
     cors_allow_origins,
 )
 from backend.app.database import get_session_factory, init_db
 from backend.app.services.seed import seed_products_from_registry
 
 STATIC_DIR = ROOT_DIR / "backend" / "app" / "static"
-POS_INDEX = FRONTEND_DIR / "index.html"
-if not POS_INDEX.is_file():
-    POS_INDEX = STATIC_DIR / "pos" / "index.html"
+_HTML_HEADERS = {"Cache-Control": "no-store"}
+
+
+def _pos_index() -> Path:
+    frontend_index = FRONTEND_DIR / "index.html"
+    if frontend_index.is_file():
+        return frontend_index
+    return STATIC_DIR / "pos" / "index.html"
+
+
+def _favicon() -> Path:
+    fav = FRONTEND_DIR / "src" / "favicon.png"
+    if fav.is_file():
+        return fav
+    return STATIC_DIR / "pos" / "favicon.png"
 
 _runtime: dict[str, str | bool | None] = {
     "yolo": "not_loaded",
@@ -140,6 +153,7 @@ app = FastAPI(title=PROJECT_NAME, lifespan=lifespan)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=cors_allow_origins(),
+    allow_origin_regex=cors_allow_origin_regex(),
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allow_headers=["*"],
@@ -151,6 +165,7 @@ app.include_router(pos_router)
 app.include_router(caption_router)
 app.include_router(products_router, prefix="/api")
 app.include_router(cart_router, prefix="/api")
+app.include_router(pos_router, prefix="/api")
 app.include_router(caption_router, prefix="/api")
 
 frontend_src = FRONTEND_DIR / "src"
@@ -162,28 +177,25 @@ if STATIC_DIR.is_dir():
 
 @app.get("/")
 def root():
-    if POS_INDEX.is_file():
-        return FileResponse(POS_INDEX, media_type="text/html")
+    path = _pos_index()
+    if path.is_file():
+        return FileResponse(path, media_type="text/html", headers=_HTML_HEADERS)
     return {"project": PROJECT_NAME, "status": "running", "ui": "not_bundled"}
 
 
 @app.get("/favicon.ico", include_in_schema=False)
 def favicon_ico() -> Response:
-    for name in ("favicon.ico", "favicon.png"):
-        path = FRONTEND_DIR / name
-        if path.is_file():
-            media = "image/x-icon" if path.suffix == ".ico" else "image/png"
-            return FileResponse(path, media_type=media)
+    path = _favicon()
+    if path.is_file():
+        return FileResponse(path, media_type="image/png")
     return Response(status_code=204)
 
 
 @app.get("/favicon.png", include_in_schema=False)
 def favicon_png() -> Response:
-    for name in ("favicon.png", "favicon.ico"):
-        path = FRONTEND_DIR / name
-        if path.is_file():
-            media = "image/png" if path.suffix == ".png" else "image/x-icon"
-            return FileResponse(path, media_type=media)
+    path = _favicon()
+    if path.is_file():
+        return FileResponse(path, media_type="image/png")
     return Response(status_code=204)
 
 

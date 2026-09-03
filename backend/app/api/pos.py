@@ -9,9 +9,14 @@ from backend.app.config import FRONTEND_DIR, ROOT_DIR
 from backend.app.services.camera_hub import CameraControlError, get_camera_hub
 
 router = APIRouter(tags=["pos"])
-POS_INDEX = FRONTEND_DIR / "index.html"
-if not POS_INDEX.is_file():
-    POS_INDEX = ROOT_DIR / "backend" / "app" / "static" / "pos" / "index.html"
+_HTML_HEADERS = {"Cache-Control": "no-store"}
+
+
+def _pos_index():
+    frontend_index = FRONTEND_DIR / "index.html"
+    if frontend_index.is_file():
+        return frontend_index
+    return ROOT_DIR / "backend" / "app" / "static" / "pos" / "index.html"
 
 
 def _mjpeg():
@@ -24,7 +29,7 @@ def _mjpeg():
 
 @router.get("/pos")
 def pos_page() -> FileResponse:
-    return FileResponse(POS_INDEX, media_type="text/html")
+    return FileResponse(_pos_index(), media_type="text/html", headers=_HTML_HEADERS)
 
 
 @router.get("/pos/stream")
