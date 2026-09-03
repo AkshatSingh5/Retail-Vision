@@ -6,6 +6,7 @@ requires-python = ">=3.12"
 # GPU / vision stack: pip install -r backend/requirements.txt  (or uv sync --extra ml)
 # Do not deploy this Python project to Vercel.
 dependencies = [
+    "alembic==1.19.1",
     "annotated-doc==0.0.5",
     "annotated-types==0.8.0",
     "anyio==4.14.2",

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from collections.abc import Generator
 from pathlib import Path
 
@@ -8,6 +9,7 @@ from sqlalchemy.engine import Engine, make_url
 from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
 
 from backend.app.config import DATABASE_URL, ON_VERCEL, ROOT_DIR
+from backend.app.paths import BACKEND_DIR
 
 
 class Base(DeclarativeBase):
@@ -102,16 +104,12 @@ def init_db(url: str | None = None) -> Engine:
     from backend.app import models as _models  # noqa: F401
 
     engine = get_engine(url)
-    _repair_orphaned_sequences(engine)
-    Base.metadata.create_all(bind=engine)
-    _migrate_product_columns(engine)
+    _run_migrations(engine, url)
     try:
         from backend.app.services.vector_search import ensure_pgvector_schema
 
         ensure_pgvector_schema(engine)
     except Exception as extra:
-        import logging
-
         logging.getLogger(__name__).warning("pgvector setup skipped: %s", extra)
     try:
         from backend.app.services.seed import seed_products_from_registry
@@ -123,8 +121,6 @@ def init_db(url: str | None = None) -> Engine:
             seed_products_from_registry(session)
             session.commit()
         except Exception as extra:
-            import logging
-
             session.rollback()
             logging.getLogger(__name__).warning("catalog seed skipped: %s", extra)
         finally:
@@ -132,6 +128,61 @@ def init_db(url: str | None = None) -> Engine:
     except Exception:
         pass
     return engine
+
+
+def _run_migrations(engine: Engine, url: str | None = None) -> None:
+    """Apply schema migrations through Alembic.
+
+    Databases created by the pre-Alembic ``create_all`` bootstrap carry no
+    ``alembic_version`` table. Those already matching the current schema are
+    stamped at ``head`` so the baseline revision is not re-applied over existing
+    tables; partially-built legacy databases are first patched by
+    :func:`_legacy_upgrade`. Either way, Alembic owns the schema from the next
+    revision onward.
+    """
+    from sqlalchemy import inspect
+
+    from alembic import command
+
+    tables = set(inspect(engine).get_table_names())
+    expected = set(Base.metadata.tables.keys())
+
+    if tables and "alembic_version" not in tables:
+        missing = expected - tables
+        if missing:
+            _legacy_upgrade(engine)
+            logging.getLogger(__name__).info(
+                "Legacy database was missing %s; patched with legacy bootstrap.",
+                sorted(missing),
+            )
+        logging.getLogger(__name__).info("Stamping legacy database at alembic head.")
+        _alembic(command.stamp, "head", url)
+    _alembic(command.upgrade, "head", url)
+
+
+def _legacy_upgrade(engine: Engine) -> None:
+    """Deprecated pre-Alembic bootstrap, kept only to adopt existing databases."""
+    _repair_orphaned_sequences(engine)
+    Base.metadata.create_all(bind=engine)
+    _migrate_product_columns(engine)
+
+
+def _alembic(action, target: str, url: str | None = None) -> None:
+    """Run an Alembic command against the resolved database.
+
+    ``config.attributes`` hands the application's already-built engine to
+    ``env.py`` so migrations share the exact engine (required for in-memory
+    SQLite), and pins ``forced_url`` so test override URLs cannot be shadowed by
+    a project-level DATABASE_URL.
+    """
+    from alembic.config import Config
+
+    config = Config(str(BACKEND_DIR / "alembic.ini"))
+    config.set_main_option("script_location", str(BACKEND_DIR / "alembic"))
+    config.attributes["forced_url"] = resolve_database_url(url)
+    if _engine is not None:
+        config.attributes["engine"] = _engine
+    action(config, target)
 
 
 def _repair_orphaned_sequences(engine: Engine) -> None:

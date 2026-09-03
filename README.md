@@ -208,6 +208,15 @@ python scripts/setup_pgvector.py
 
 The API also tries to enable the extension on startup. The database role needs permission to `CREATE EXTENSION vector`.
 
+Schema changes are versioned with **Alembic** (`backend/alembic/`). The backend applies pending migrations automatically on startup (SQLite and PostgreSQL), and legacy databases are adopted automatically. For CLI use:
+
+```bash
+alembic -c backend/alembic.ini upgrade head   # apply migrations
+alembic -c backend/alembic.ini revision --autogenerate -m "describe change"  # new migration
+```
+
+See `backend/README.md` → "Database migrations (Alembic)" for details.
+
 ---
 
 ## 9. GPU requirements
